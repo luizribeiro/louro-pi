@@ -1,0 +1,39 @@
+{
+  "providers": {
+    "tpl": {
+      "baseUrl": "https://litellm.thepromisedlan.club/v1",
+      "api": "openai-completions",
+      "apiKey": "$LITELLM_API_KEY",
+      // Hack: litellm's session-affinity hook (ops config/litellm/custom_callbacks.py)
+      // hashes each conversation's opening to pick vanadium or sodium for
+      // vllm/qwen3.8-27b, ignoring whether that host is up. louro-pi's opening
+      // never changes, so it always hashed to sodium. "louro" happens to hash to
+      // vanadium. Drop this once the hook skips hosts that are down.
+      "headers": { "x-session-id": "louro" },
+      "models": [
+        {
+          "id": "vllm/qwen3.8-27b",
+          "name": "Qwen 3.8 27B (vanadium NVFP4)",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh"
+          },
+          "input": ["text", "image"],
+          "contextWindow": 262144,
+          "maxTokens": 32768,
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": true,
+            "maxTokensField": "max_tokens"
+          },
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}

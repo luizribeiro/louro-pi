@@ -1,0 +1,11 @@
+{
+  "defaultProvider": "tpl",
+  "defaultModel": "vllm/qwen3.8-27b",
+  "defaultThinkingLevel": "medium",
+  "hideThinkingBlock": true,
+  "quietStartup": true,
+  "theme": "dark",
+  "enabledModels": [
+    "tpl/vllm/qwen3.8-27b"
+  ]
+}
