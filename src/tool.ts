@@ -1,10 +1,35 @@
 import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, defineTool, section } from "@earendil-works/pi-durable";
+import { defineExtension, defineTool, LiveDoc, section, type ToolExecutionResult } from "@earendil-works/pi-durable";
 import { formatResult, parseCommand } from "./command.ts";
 import { runLouro } from "./louro.ts";
 
 const TIMEOUT_MS = 60_000;
 export const MAX_COMMAND_LENGTH = 2000;
+export const MAX_CALLS_PER_RUN = 8;
+export const CALLS_BEFORE_ENDING_RUN = MAX_CALLS_PER_RUN + 4;
+export const TOO_MANY_CALLS = "too many louro calls this turn; reply in text without tools";
+
+export type CallVerdict = "run" | "refuse" | "end";
+
+/** Counts calls per run; past the cap they are refused, and a model that keeps calling gets its run ended. */
+export function callCounter(): (run: string) => CallVerdict {
+	let current: string | undefined;
+	let calls = 0;
+	return (run) => {
+		if (run !== current) {
+			current = run;
+			calls = 0;
+		}
+		calls++;
+		return calls <= MAX_CALLS_PER_RUN ? "run" : calls <= CALLS_BEFORE_ENDING_RUN ? "refuse" : "end";
+	};
+}
+
+const countCall = callCounter();
+
+function failure(text: string): ToolExecutionResult {
+	return { output: [{ type: "text", text }], isError: true };
+}
 
 export const WAIT_NOTE =
 	"You don't run `louro wait`: louro waits for you, and new IRC events arrive as messages. Reply with `louro send`.";
@@ -18,7 +43,12 @@ export const louroTool = defineTool({
 			description: "One louro command line, quoted like in sh, e.g. louro send '#bots' 'hi there'",
 		}),
 	}),
-	async execute({ command }, _api, context) {
+	async execute({ command }, api, context) {
+		// A run's first input names it; ending a run lets the queued chat start the next one.
+		const live = await api.snapshot(LiveDoc, api.conversationId, context);
+		const verdict = countCall(String(live?.run?.inputs[0]));
+		if (verdict === "refuse") return failure(TOO_MANY_CALLS);
+		if (verdict === "end") return { ...failure(TOO_MANY_CALLS), control: { terminate: true } };
 		let args: string[];
 		try {
 			if (command.length > MAX_COMMAND_LENGTH) {
@@ -26,7 +56,7 @@ export const louroTool = defineTool({
 			}
 			args = parseCommand(command);
 		} catch (error) {
-			return { output: [{ type: "text", text: (error as Error).message }], isError: true };
+			return failure((error as Error).message);
 		}
 		const { error, stdout, stderr } = await runLouro(args, TIMEOUT_MS, context.abortSignal);
 		return { output: [{ type: "text", text: formatResult(error, stdout, stderr) }], isError: error !== null };
