@@ -5,11 +5,11 @@ alt_nicks = ["louro_", "louro__"]
 sasl_username = "louro"
 # A FIFO that louro-pi feeds from sops, in its temporary run directory.
 password_file = "password"
-autojoin = ["#bots", "#lounge"]
+autojoin = ["#bots"]
 
 [grants]
-irc.join = ["#bots", "#lounge"]
-irc.send = ["#bots", "#lounge"]
+irc.join = ["#bots"]
+irc.send = ["#bots"]
 irc.dm.read = ["account:luiz"]
 irc.dm.send = ["account:luiz"]
 # For the operator; the louro-pi tool never lets the agent run quit.
