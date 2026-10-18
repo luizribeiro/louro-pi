@@ -1,7 +1,6 @@
-// The commands an agent needs; `connect` and `quit` are the operator's.
+// The commands an agent needs; `connect` and `quit` are the operator's, and the daemon owns `wait` and its cursor.
 const ALLOWED_SUBCOMMANDS = new Set([
 	"status",
-	"wait",
 	"send",
 	"react",
 	"redact",
@@ -60,7 +59,7 @@ export function parseCommand(line: string): string[] {
 	return words.slice(1);
 }
 
-type ExecError = { code?: number | string | null; signal?: NodeJS.Signals | null; message: string };
+export type ExecError = { code?: number | string | null; signal?: NodeJS.Signals | null; message: string };
 
 /** One status line, then louro's stdout and stderr; a timeout or abort shows as `killed:SIGNAL`. */
 export function formatResult(error: ExecError | null, stdout: string, stderr: string): string {

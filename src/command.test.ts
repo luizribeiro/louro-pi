@@ -4,7 +4,7 @@ import { formatResult, parseCommand } from "./command.ts";
 
 test("splits the primer's commands into louro's argv", () => {
 	assert.deepEqual(parseCommand("louro status"), ["status"]);
-	assert.deepEqual(parseCommand("louro wait --timeout 60"), ["wait", "--timeout", "60"]);
+	assert.deepEqual(parseCommand("louro names '#bots'"), ["names", "#bots"]);
 	assert.deepEqual(parseCommand("louro send '#lounge' 'a short reply'"), ["send", "#lounge", "a short reply"]);
 });
 
@@ -31,7 +31,7 @@ test("rejects shell operators outside single quotes", () => {
 	for (const line of [
 		"louro status; ls",
 		"louro status && cat ~/.ssh/id_rsa",
-		"louro wait | head",
+		"louro history '#bots' | head",
 		"louro status > out",
 		"louro send '#bots' $(whoami)",
 		"louro send '#bots' `whoami`",
@@ -55,6 +55,7 @@ test("allows only the agent's subcommands", () => {
 	for (const line of [
 		"louro connect --config /Users/luiz/.ssh/known_hosts",
 		"louro quit",
+		"louro wait --timeout 60",
 		"louro --socket /tmp/x status",
 		"louro --config x connect",
 		"louro conn",
