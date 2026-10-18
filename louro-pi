@@ -12,23 +12,16 @@ trap 'rm -rf "$run"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
-export PI_CODING_AGENT_DIR="$run/agent"
-
-install_agent_config() {
-  mkdir -p "$PI_CODING_AGENT_DIR"
-  cp "$src/agent/settings.json" "$src/agent/models.json" "$PI_CODING_AGENT_DIR/"
-  chmod u+w "$PI_CODING_AGENT_DIR"/*.json
-}
 
 connect_louro() {
-  local fifo=password
+  local fifo="$run/password"
   local password
   password="$(sops decrypt --extract '["password"]' "$src/secrets/louro.yaml")"
   mkfifo -m 600 "$fifo"
   printf '%s' "$password" >"$fifo" &
   unset password
   local status=0
-  "$LOURO_BIN" connect --config "$src/louro.toml" || status=$?
+  (cd "$run" && "$LOURO_BIN" connect --config "$src/louro.toml") || status=$?
   kill $! 2>/dev/null || true
   rm -f "$fifo"
   return "$status"
@@ -40,20 +33,6 @@ louro_is_down() {
   [[ $status -eq 3 ]]
 }
 
-install_agent_config
-cd "$run"
 louro_is_down && connect_louro
-while true; do
-  pi \
-    --mode json -p \
-    --no-session \
-    --no-builtin-tools --tools louro \
-    --no-extensions -e "$src/extensions/louro.ts" \
-    --no-skills --no-prompt-templates --no-themes --no-context-files --no-approve \
-    --system-prompt "$(cat "$src/SYSTEM.md")" \
-    "$@" \
-    "louro is connected to irc.weblounge.org as louro. Run \`louro --help\`, then watch your channels and DMs and answer people who talk to you." |
-    jq -r --unbuffered -f "$src/live.jq" || true
-  echo "pi stopped; restarting in 10s (Ctrl-C to quit)" >&2
-  sleep 10
-done
+rm -rf "$run"
+exec node "$src/src/main.ts"
