@@ -135,11 +135,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1792301391,
-        "narHash": "sha256-KvSS9C4130bBTzz67o75/8ZztGWuH1vtn4RDQVLRePI=",
+        "lastModified": 1792317081,
+        "narHash": "sha256-eepLyYcEDbUkY3Q9zorRe2e4Z5j4IjvZ6OMKv3bAejk=",
         "ref": "refs/heads/main",
-        "rev": "962131a5ed8aad0709083fddc7696ba41d4f2226",
-        "revCount": 164,
+        "rev": "3e6b7a472eeaa0f85f579106df5b4e16c4684879",
+        "revCount": 180,
         "type": "git",
         "url": "https://github.com/luizribeiro/louro"
       },
