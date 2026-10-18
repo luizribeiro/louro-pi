@@ -8,7 +8,6 @@ import {
 	louroExtension,
 	louroTool,
 	MAX_CALLS_PER_RUN,
-	MAX_COMMAND_LENGTH,
 	TOO_MANY_CALLS,
 	WAIT_NOTE,
 } from "./tool.ts";
@@ -49,16 +48,6 @@ test("rejects a disallowed command without running louro", async () => {
 		assert.equal(result.isError, true, command);
 		assert.match(JSON.stringify(result.output), /not allowed/, command);
 	}
-});
-
-test("rejects a command over the length limit without running louro", async () => {
-	const api = inNewRun();
-	const command = `louro send '#bots' '${"spam ".repeat(400)}'`;
-	const result = await louroTool.execute({ command }, api, BACKGROUND_CONTEXT);
-	assert.equal(result.isError, true);
-	assert.deepEqual(result.output, [
-		{ type: "text", text: `command is ${command.length} characters; the limit is ${MAX_COMMAND_LENGTH}` },
-	]);
 });
 
 test("allows 8 calls per run, refuses 4 more, then ends the run", () => {

@@ -4,7 +4,6 @@ import { formatResult, parseCommand } from "./command.ts";
 import { runLouro } from "./louro.ts";
 
 const TIMEOUT_MS = 60_000;
-export const MAX_COMMAND_LENGTH = 2000;
 export const MAX_CALLS_PER_RUN = 8;
 export const CALLS_BEFORE_ENDING_RUN = MAX_CALLS_PER_RUN + 4;
 export const TOO_MANY_CALLS = "too many louro calls this turn; reply in text without tools";
@@ -51,9 +50,6 @@ export const louroTool = defineTool({
 		if (verdict === "end") return { ...failure(TOO_MANY_CALLS), control: { terminate: true } };
 		let args: string[];
 		try {
-			if (command.length > MAX_COMMAND_LENGTH) {
-				throw new Error(`command is ${command.length} characters; the limit is ${MAX_COMMAND_LENGTH}`);
-			}
 			args = parseCommand(command);
 		} catch (error) {
 			return failure((error as Error).message);
