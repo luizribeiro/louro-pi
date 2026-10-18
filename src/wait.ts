@@ -6,7 +6,38 @@ import { formatBatch } from "./view.ts";
 export const WAIT_ARGS = ["wait", "--timeout", "60"];
 const BACKOFF_MS = 5_000;
 
-type Batch = { notice?: string; events: unknown[] };
+export const MAX_BATCH_BYTES = 16 * 1024;
+export const TRIMMED = "…[trimmed]";
+
+type Event = { text?: unknown };
+type Batch = { notice?: string; events: Event[] };
+
+const utf8Bytes = (text: string) => Buffer.byteLength(text);
+const jsonBytes = (text: string) => utf8Bytes(JSON.stringify(text)) - 2;
+
+function cutToBytes(text: string, max: number): string {
+	let cut = "";
+	let used = 0;
+	for (const char of text) {
+		used += jsonBytes(char);
+		if (used > max) return `${cut}${TRIMMED}`;
+		cut += char;
+	}
+	return cut;
+}
+
+/** The batch as the model reads it, each event's text trimmed so the whole stays under MAX_BATCH_BYTES. */
+export function renderBatch({ notice, events }: Batch): string {
+	const content = JSON.stringify({ notice, events });
+	if (utf8Bytes(content) <= MAX_BATCH_BYTES) return content;
+	const texts = events.map((event) => (typeof event.text === "string" ? jsonBytes(event.text) : 0));
+	const overhead = utf8Bytes(content) - texts.reduce((sum, bytes) => sum + bytes, 0);
+	const share = Math.floor((MAX_BATCH_BYTES - overhead) / events.length) - jsonBytes(TRIMMED);
+	const trimmed = events.map((event) =>
+		typeof event.text === "string" ? { ...event, text: cutToBytes(event.text, share) } : event,
+	);
+	return JSON.stringify({ notice, events: trimmed });
+}
 
 export type WaitStep =
 	| { kind: "submit"; input: InputSubmissionDraft; count: number }
@@ -29,7 +60,7 @@ export function nextStep({ error, stdout, stderr }: LouroResult, newId: () => st
 		count: batch.events.length,
 		input: {
 			type: "input",
-			content: JSON.stringify({ notice: batch.notice, events: batch.events }),
+			content: renderBatch(batch),
 			// Unique per batch: louro restarts its cursor at 0, and pi-durable silently drops a request id it has seen.
 			requestId: `louro-wait-${newId()}`,
 			whenBusy: "followUp",

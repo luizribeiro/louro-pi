@@ -3,7 +3,8 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import type { AgentChange, Extension, HarnessSettings, ToolRegistration } from "@earendil-works/pi-durable";
 
 export const CONTEXT_WINDOW = 65536;
-export const KEEP_RECENT_TOKENS = 20000;
+// Small enough that a compaction leaves room for a few full batches (MAX_BATCH_BYTES) below the blocking threshold.
+export const KEEP_RECENT_TOKENS = 8000;
 
 const PROVIDER = "litellm";
 

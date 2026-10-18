@@ -22,5 +22,5 @@ test("settings queue every batch, back off a long time and compact for a 64k win
 		retry: { maxRetries: 10, maxAgentDelayMs: 300_000 },
 		compaction: { enabled: true, keepRecentTokens: KEEP_RECENT_TOKENS, backgroundTokens: 16384 },
 	});
-	assert.equal(KEEP_RECENT_TOKENS, 20000);
+	assert.equal(KEEP_RECENT_TOKENS, 8000);
 });
