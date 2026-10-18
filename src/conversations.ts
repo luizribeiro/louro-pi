@@ -12,18 +12,18 @@ type Event = {
 };
 
 /**
- * Only an event louro marks public goes to a channel. Anything else with a sender, a DM or an invite, goes to the
- * sender's DMs; events with neither, like louro's own connection reports, belong to no conversation.
+ * Only an event louro marks public goes to a channel. Anything else, a DM or an invite, goes to the sender's DMs if
+ * they're logged in; events with no account, and louro's own connection reports, belong to no conversation.
  */
 export function routeOf(event: Event): Route | undefined {
 	if (event.private === false && typeof event.target === "string") {
 		return { key: casefold(event.target), scope: { kind: "channel", name: event.target } };
 	}
 	const { nick, account } = event.from ?? {};
-	if (typeof nick !== "string") return undefined;
-	// An account is proof of who sent it; a bare nick is not, so the two never share a conversation.
-	const key = typeof account === "string" ? `account:${casefold(account)}` : `nick:${casefold(nick)}`;
-	return { key, scope: { kind: "dm", partner: nick } };
+	// A DM conversation's tool can read and send by nick, so a sender without an account could hold a logged-in
+	// partner's nick and receive their DMs.
+	if (typeof nick !== "string" || typeof account !== "string") return undefined;
+	return { key: `account:${casefold(account)}`, scope: { kind: "dm", partner: nick } };
 }
 
 type Known = { byKey: Record<string, { id: ConversationId; scope: Scope }> };

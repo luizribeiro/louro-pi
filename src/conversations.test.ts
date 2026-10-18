@@ -20,16 +20,14 @@ test("routes channel chat to its channel, casefolded", () => {
 	});
 });
 
-test("routes a DM by the sender's account, else their nick, never sharing a key", () => {
+test("routes a DM by the sender's account, and drops one from a sender who isn't logged in", () => {
 	const dm = { ...chat, target: "Luiz_", private: true, text: "the secret word is papaya" };
 	assert.deepEqual(routeOf({ ...dm, from: { ...luiz, nick: "Luiz_", account: "Luiz" } }), {
 		key: "account:luiz",
 		scope: { kind: "dm", partner: "Luiz_" },
 	});
-	assert.deepEqual(routeOf({ ...dm, target: "luiz", from: { ...luiz, account: null } }), {
-		key: "nick:luiz",
-		scope: { kind: "dm", partner: "luiz" },
-	});
+	assert.equal(routeOf({ ...dm, target: "luiz", from: { ...luiz, account: null } }), undefined);
+	assert.equal(routeOf({ ...dm, target: "luiz", from: { nick: "luiz" } }), undefined);
 });
 
 test("routes an invite to the inviter's DMs and louro's connection reports nowhere", () => {
