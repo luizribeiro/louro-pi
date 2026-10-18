@@ -4,7 +4,11 @@ import type { AgentEvent, EntryRecord } from "@earendil-works/pi-durable";
 const MAX_LINE = 300;
 
 export function oneLine(text: string): string {
-	const line = text.replace(/\s+/g, " ").trim();
+	// \p{Cc} is C0, DEL and C1: untrusted text must not drive the terminal.
+	const line = text
+		.replace(/\s+/g, " ")
+		.replace(/\p{Cc}/gu, "")
+		.trim();
 	return line.length > MAX_LINE ? `${line.slice(0, MAX_LINE)}…` : line;
 }
 
@@ -25,7 +29,7 @@ export function formatBatch(count: number): string {
 export function formatEvent(event: AgentEvent): string[] {
 	switch (event.type) {
 		case "tool_execution_start":
-			return [`$ ${event.args.command}`];
+			return [`$ ${oneLine(String(event.args.command))}`];
 		case "tool_execution_end":
 			return event.entry ? [`  ${textOf(messageOf(event.entry, "toolResult"))}`] : [];
 		case "message_end": {

