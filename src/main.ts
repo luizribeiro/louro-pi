@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -66,6 +67,7 @@ harness.resume();
 await forwardEvents(
 	{
 		wait: (signal) => runLouro(WAIT_ARGS, WAIT_TIMEOUT_MS, signal),
+		newId: randomUUID,
 		// Admission is owed once louro handed the batch over, so shutdown must not abort it.
 		submit: (input) => root.submit(input, BACKGROUND_CONTEXT),
 		sleep: (ms, signal) => sleep(ms, undefined, { signal }).catch(() => {}),

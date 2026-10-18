@@ -25,15 +25,20 @@ function waited(batch: object) {
 	return { error: null, stdout: `${JSON.stringify(batch)}\n`, stderr: "" };
 }
 
-test("submits a batch as one follow-up input keyed by its cursor", () => {
-	const step = nextStep(waited({ cursor: 42, timed_out: false, more: false, notice: NOTICE, events: [MESSAGE] }));
+const newId = () => "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90";
+
+test("submits a batch as one follow-up input with a fresh request id", () => {
+	const step = nextStep(
+		waited({ cursor: 42, timed_out: false, more: false, notice: NOTICE, events: [MESSAGE] }),
+		newId,
+	);
 	assert.deepEqual(step, {
 		kind: "submit",
 		count: 1,
 		input: {
 			type: "input",
 			content: JSON.stringify({ notice: NOTICE, events: [MESSAGE] }),
-			requestId: "louro-wait-42",
+			requestId: "louro-wait-0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90",
 			whenBusy: "followUp",
 		},
 	});
@@ -41,25 +46,30 @@ test("submits a batch as one follow-up input keyed by its cursor", () => {
 
 test("submits the first page of a batch with more queued", () => {
 	const next = { ...MESSAGE, id: 43, from: { ...MESSAGE.from, nick: "maria", account: "maria" }, text: "hi all" };
-	const step = nextStep(waited({ cursor: 43, timed_out: false, more: true, notice: NOTICE, events: [MESSAGE, next] }));
+	const step = nextStep(
+		waited({ cursor: 43, timed_out: false, more: true, notice: NOTICE, events: [MESSAGE, next] }),
+		newId,
+	);
 	assert.equal(step.kind, "submit");
 	assert.equal(step.kind === "submit" && step.count, 2);
-	assert.equal(step.kind === "submit" && step.input.requestId, "louro-wait-43");
 });
 
 test("a timeout is idle, not an error", () => {
-	assert.deepEqual(nextStep(waited({ cursor: 42, timed_out: true, more: false, notice: NOTICE, events: [] })), {
+	assert.deepEqual(nextStep(waited({ cursor: 42, timed_out: true, more: false, notice: NOTICE, events: [] }), newId), {
 		kind: "idle",
 	});
 });
 
 test("backs off when louro fails", () => {
 	assert.deepEqual(
-		nextStep({
-			error: { code: 3, message: "Command failed: louro wait --timeout 60" },
-			stdout: '{"v":1,"error":{"code":"no_session","message":"louro isn\'t running"}}\n',
-			stderr: "louro: louro isn't running\n",
-		}),
+		nextStep(
+			{
+				error: { code: 3, message: "Command failed: louro wait --timeout 60" },
+				stdout: '{"v":1,"error":{"code":"no_session","message":"louro isn\'t running"}}\n',
+				stderr: "louro: louro isn't running\n",
+			},
+			newId,
+		),
 		{
 			kind: "backoff",
 			reason:
@@ -70,7 +80,7 @@ test("backs off when louro fails", () => {
 
 test("backs off on output that isn't a batch", () => {
 	for (const stdout of ["", "not json\n", "null\n", '{"cursor":1}\n']) {
-		assert.equal(nextStep({ error: null, stdout, stderr: "" }).kind, "backoff", JSON.stringify(stdout));
+		assert.equal(nextStep({ error: null, stdout, stderr: "" }, newId).kind, "backoff", JSON.stringify(stdout));
 	}
 });
 
@@ -79,7 +89,9 @@ function harness(results: ((signal: AbortSignal, controller: AbortController) =>
 	const calls: string[] = [];
 	const submitted: InputSubmissionDraft[] = [];
 	let failures = 0;
+	let ids = 0;
 	const loop: WaitLoop = {
+		newId: () => `id-${++ids}`,
 		async wait(signal) {
 			calls.push("wait");
 			const next = results.shift();
@@ -120,7 +132,16 @@ test("forwards a batch once, then waits again", async () => {
 	const loop = harness([() => BATCH]);
 	await loop.run();
 	assert.deepEqual(loop.calls, ["wait", "< 1 event", "submit", "wait"]);
-	assert.equal(loop.submitted[0]?.requestId, "louro-wait-42");
+	assert.equal(loop.submitted[0]?.requestId, "louro-wait-id-1");
+});
+
+test("gives batches with the same cursor different request ids, as after a louro restart", async () => {
+	const loop = harness([() => BATCH, () => BATCH]);
+	await loop.run();
+	assert.deepEqual(
+		loop.submitted.map((input) => input.requestId),
+		["louro-wait-id-1", "louro-wait-id-2"],
+	);
 });
 
 test("retries a failed submit with the same request before waiting again", async () => {
@@ -141,7 +162,7 @@ test("retries a failed submit with the same request before waiting again", async
 	]);
 	assert.deepEqual(
 		loop.submitted.map((input) => input.requestId),
-		["louro-wait-42", "louro-wait-42", "louro-wait-42"],
+		["louro-wait-id-1", "louro-wait-id-1", "louro-wait-id-1"],
 	);
 });
 
