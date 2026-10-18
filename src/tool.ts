@@ -4,6 +4,7 @@ import { formatResult, parseCommand } from "./command.ts";
 import { runLouro } from "./louro.ts";
 
 const TIMEOUT_MS = 60_000;
+export const MAX_COMMAND_LENGTH = 2000;
 
 export const WAIT_NOTE =
 	"You don't run `louro wait`: louro waits for you, and new IRC events arrive as messages. Reply with `louro send`.";
@@ -20,6 +21,9 @@ export const louroTool = defineTool({
 	async execute({ command }, _api, context) {
 		let args: string[];
 		try {
+			if (command.length > MAX_COMMAND_LENGTH) {
+				throw new Error(`command is ${command.length} characters; the limit is ${MAX_COMMAND_LENGTH}`);
+			}
 			args = parseCommand(command);
 		} catch (error) {
 			return { output: [{ type: "text", text: (error as Error).message }], isError: true };

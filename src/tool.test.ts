@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { ConversationId } from "@earendil-works/pi-durable";
-import { louroExtension, louroTool, WAIT_NOTE } from "./tool.ts";
+import { louroExtension, louroTool, MAX_COMMAND_LENGTH, WAIT_NOTE } from "./tool.ts";
 
 const SYSTEM = "You are louro, a bot on IRC.\n";
 const PRIMER = "louro connects you to IRC as a bot.\n\nRun `louro <command> --help` for a command's flags.\n";
@@ -30,4 +30,14 @@ test("rejects a disallowed command without running louro", async () => {
 		assert.equal(result.isError, true, command);
 		assert.match(JSON.stringify(result.output), /not allowed/, command);
 	}
+});
+
+test("rejects a command over the length limit without running louro", async () => {
+	const api = {} as Parameters<typeof louroTool.execute>[1];
+	const command = `louro send '#bots' '${"spam ".repeat(400)}'`;
+	const result = await louroTool.execute({ command }, api, BACKGROUND_CONTEXT);
+	assert.equal(result.isError, true);
+	assert.deepEqual(result.output, [
+		{ type: "text", text: `command is ${command.length} characters; the limit is ${MAX_COMMAND_LENGTH}` },
+	]);
 });
