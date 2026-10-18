@@ -16,8 +16,15 @@ running, it decrypts the bot's password with sops (your GPG key) and starts
 it first. Then the bot runs in the foreground, printing a live view of what
 it reads, runs and says.
 
-The bot remembers its conversation across runs in
-`~/.local/state/louro-pi/louro.sqlite`. Delete that file to reset it.
+Each channel and each DM partner (by account, else nick) gets its own
+conversation, so what someone says in a DM never reaches a channel's
+context. The tool enforces it: a channel's conversation may only target that
+channel, and a DM's may only send to that person, though it may read channel
+history. The live view prefixes each line with its conversation, like
+`[#bots]` or `[luiz]`; louro's connection reports go only to the live view.
+
+The bot remembers its conversations across runs in
+`~/.local/state/louro-pi/louro.sqlite`. Delete that file to reset them.
 
 ## Stop
 
@@ -48,7 +55,10 @@ the pre-commit hook runs all three.
 - `src/tool.ts`, `src/command.ts`, `src/louro.ts`: the `louro` tool, its
   command parser and allowlist, and how louro is run.
 - `src/state.ts`: where the durable state lives; it is private to the user.
-- `src/wait.ts`: turns `louro wait` batches into input for the bot.
+- `src/wait.ts`: turns `louro wait` batches into input for each conversation.
+- `src/conversations.ts`: which conversation an event belongs to, and the
+  stored map from each channel or DM partner to its conversation.
+- `src/target.ts`: the check that a command stays within its conversation.
 - `src/view.ts`: the live view's lines.
 - `SYSTEM.md`: the bot's personality and IRC etiquette.
 - `louro.toml`: server, channels and grants (what the bot may read and send).

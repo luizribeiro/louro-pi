@@ -1,5 +1,6 @@
 import type { Message } from "@earendil-works/pi-ai";
 import type { AgentEvent, EntryRecord } from "@earendil-works/pi-durable";
+import type { Scope } from "./target.ts";
 
 const MAX_LINE = 300;
 
@@ -20,6 +21,16 @@ function messageOf<R extends Message["role"]>(entry: EntryRecord | undefined, ro
 
 function textOf(message: Of<"assistant" | "toolResult"> | undefined): string {
 	return oneLine((message?.content ?? []).map((block) => (block.type === "text" ? block.text : "")).join(" "));
+}
+
+/** A conversation's line, prefixed with its channel or DM partner. */
+export function labeled(scope: Scope, line: string): string {
+	return `[${oneLine(scope.kind === "channel" ? scope.name : scope.partner)}] ${line}`;
+}
+
+/** An event no conversation gets, like louro's connection reports. */
+export function formatUnrouted(event: object): string {
+	return `~ ${oneLine(JSON.stringify(event))}`;
 }
 
 export function formatBatch(count: number): string {

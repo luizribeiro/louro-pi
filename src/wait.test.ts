@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { InputSubmissionDraft } from "@earendil-works/pi-durable";
+import type { Route } from "./conversations.ts";
 import type { LouroResult } from "./louro.ts";
 import { forwardEvents, MAX_BATCH_BYTES, nextStep, renderBatch, TRIMMED, type WaitLoop } from "./wait.ts";
 
@@ -27,6 +28,27 @@ function waited(batch: object) {
 
 const newId = () => "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90";
 
+const BOTS = { key: "#bots", scope: { kind: "channel", name: "#bots" } };
+const LUIZ = { key: "account:luiz", scope: { kind: "dm", partner: "luiz" } };
+
+const DM = {
+	...MESSAGE,
+	id: 43,
+	msgid: "p9x2m4k7q1wze",
+	target: "luiz",
+	private: true,
+	text: "the secret word is papaya",
+};
+
+function followUp(events: object[], requestId: string) {
+	return {
+		type: "input",
+		content: JSON.stringify({ notice: NOTICE, events }),
+		requestId: `louro-wait-${requestId}`,
+		whenBusy: "followUp",
+	};
+}
+
 test("submits a batch as one follow-up input with a fresh request id", () => {
 	const step = nextStep(
 		waited({ cursor: 42, timed_out: false, more: false, notice: NOTICE, events: [MESSAGE] }),
@@ -34,13 +56,26 @@ test("submits a batch as one follow-up input with a fresh request id", () => {
 	);
 	assert.deepEqual(step, {
 		kind: "submit",
-		count: 1,
-		input: {
-			type: "input",
-			content: JSON.stringify({ notice: NOTICE, events: [MESSAGE] }),
-			requestId: "louro-wait-0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90",
-			whenBusy: "followUp",
-		},
+		deliveries: [{ route: BOTS, count: 1, input: followUp([MESSAGE], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90") }],
+		unrouted: [],
+	});
+});
+
+test("splits a batch into one input per conversation, keeping each one's order", () => {
+	const later = { ...MESSAGE, id: 44, msgid: "r3t5y7u9i1opq", text: "louro: what did luiz DM you?" };
+	const connection = { id: 45, type: "connection", time: "2026-10-17T21:05:00.000Z", state: "disconnected" };
+	let ids = 0;
+	const step = nextStep(
+		waited({ cursor: 45, timed_out: false, more: false, notice: NOTICE, events: [MESSAGE, DM, later, connection] }),
+		() => `id-${++ids}`,
+	);
+	assert.deepEqual(step, {
+		kind: "submit",
+		deliveries: [
+			{ route: BOTS, count: 2, input: followUp([MESSAGE, later], "id-1") },
+			{ route: LUIZ, count: 1, input: followUp([DM], "id-2") },
+		],
+		unrouted: [connection],
 	});
 });
 
@@ -51,7 +86,7 @@ test("submits the first page of a batch with more queued", () => {
 		newId,
 	);
 	assert.equal(step.kind, "submit");
-	assert.equal(step.kind === "submit" && step.count, 2);
+	assert.equal(step.kind === "submit" && step.deliveries[0]?.count, 2);
 });
 
 test("a timeout is idle, not an error", () => {
@@ -103,7 +138,7 @@ test("trims each event's text so an oversized batch submits under the cap and st
 	const events = [MESSAGE, ...flood(19, `"quoted" spam\n${"spam ".repeat(800)}`)];
 	const step = nextStep(waited({ cursor: 120, timed_out: false, more: true, notice: NOTICE, events }), newId);
 	assert.equal(step.kind, "submit");
-	const content = step.kind === "submit" ? String(step.input.content) : "";
+	const content = step.kind === "submit" ? String(step.deliveries[0]?.input.content) : "";
 	assert.ok(Buffer.byteLength(content) <= MAX_BATCH_BYTES, `${Buffer.byteLength(content)} bytes`);
 	const rendered = JSON.parse(content);
 	assert.equal(rendered.notice, NOTICE);
@@ -127,7 +162,7 @@ test("counts astral characters by their UTF-8 bytes", () => {
 function harness(results: ((signal: AbortSignal, controller: AbortController) => LouroResult)[]) {
 	const controller = new AbortController();
 	const calls: string[] = [];
-	const submitted: InputSubmissionDraft[] = [];
+	const submitted: { route: Route; input: InputSubmissionDraft }[] = [];
 	let failures = 0;
 	let ids = 0;
 	const loop: WaitLoop = {
@@ -141,9 +176,9 @@ function harness(results: ((signal: AbortSignal, controller: AbortController) =>
 			}
 			return next(signal, controller);
 		},
-		async submit(input) {
-			calls.push("submit");
-			submitted.push(input);
+		async submit(route, input) {
+			calls.push(`submit ${route.key}`);
+			submitted.push({ route, input });
 			if (failures > 0) {
 				failures--;
 				throw new Error("SQLITE_BUSY: database is locked");
@@ -171,15 +206,38 @@ const TIMEOUT = waited({ cursor: 42, timed_out: true, more: false, notice: NOTIC
 test("forwards a batch once, then waits again", async () => {
 	const loop = harness([() => BATCH]);
 	await loop.run();
-	assert.deepEqual(loop.calls, ["wait", "< 1 event", "submit", "wait"]);
-	assert.equal(loop.submitted[0]?.requestId, "louro-wait-id-1");
+	assert.deepEqual(loop.calls, ["wait", "[#bots] < 1 event", "submit #bots", "wait"]);
+	assert.equal(loop.submitted[0]?.input.requestId, "louro-wait-id-1");
+});
+
+test("forwards a mixed batch to each conversation in turn, and shows louro's own reports", async () => {
+	const connection = { id: 44, type: "connection", time: "2026-10-17T21:05:00.000Z", state: "reconnected" };
+	const loop = harness([
+		() => waited({ cursor: 44, timed_out: false, more: false, notice: NOTICE, events: [MESSAGE, DM, connection] }),
+	]);
+	await loop.run();
+	assert.deepEqual(loop.calls, [
+		"wait",
+		'~ {"id":44,"type":"connection","time":"2026-10-17T21:05:00.000Z","state":"reconnected"}',
+		"[#bots] < 1 event",
+		"submit #bots",
+		"[luiz] < 1 event",
+		"submit account:luiz",
+		"wait",
+	]);
+	assert.deepEqual(
+		loop.submitted.map(({ input }) =>
+			JSON.parse(String(input.content)).events.map((event: { id: number }) => event.id),
+		),
+		[[42], [43]],
+	);
 });
 
 test("gives batches with the same cursor different request ids, as after a louro restart", async () => {
 	const loop = harness([() => BATCH, () => BATCH]);
 	await loop.run();
 	assert.deepEqual(
-		loop.submitted.map((input) => input.requestId),
+		loop.submitted.map(({ input }) => input.requestId),
 		["louro-wait-id-1", "louro-wait-id-2"],
 	);
 });
@@ -190,18 +248,18 @@ test("retries a failed submit with the same request before waiting again", async
 	await loop.run();
 	assert.deepEqual(loop.calls, [
 		"wait",
-		"< 1 event",
-		"submit",
+		"[#bots] < 1 event",
+		"submit #bots",
 		"! submit failed: Error: SQLITE_BUSY: database is locked; retrying in 5s",
 		"sleep 5000",
-		"submit",
+		"submit #bots",
 		"! submit failed: Error: SQLITE_BUSY: database is locked; retrying in 5s",
 		"sleep 5000",
-		"submit",
+		"submit #bots",
 		"wait",
 	]);
 	assert.deepEqual(
-		loop.submitted.map((input) => input.requestId),
+		loop.submitted.map(({ input }) => input.requestId),
 		["louro-wait-id-1", "louro-wait-id-1", "louro-wait-id-1"],
 	);
 });
@@ -214,7 +272,7 @@ test("still submits a batch that arrives as shutdown begins", async () => {
 		},
 	]);
 	await loop.run();
-	assert.deepEqual(loop.calls, ["wait", "< 1 event", "submit"]);
+	assert.deepEqual(loop.calls, ["wait", "[#bots] < 1 event", "submit #bots"]);
 });
 
 test("stops without submitting when shutdown kills the wait", async () => {
