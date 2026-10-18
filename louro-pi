@@ -21,7 +21,7 @@ connect_louro() {
   printf '%s' "$password" >"$fifo" &
   unset password
   local status=0
-  (cd "$run" && "$LOURO_BIN" connect --config "$src/louro.toml") || status=$?
+  (cd "$run" && env -u LITELLM_API_KEY "$LOURO_BIN" connect --config "$src/louro.toml") || status=$?
   kill $! 2>/dev/null || true
   rm -f "$fifo"
   return "$status"
@@ -29,7 +29,7 @@ connect_louro() {
 
 louro_is_down() {
   local status=0
-  "$LOURO_BIN" status >/dev/null || status=$?
+  env -u LITELLM_API_KEY "$LOURO_BIN" status >/dev/null || status=$?
   [[ $status -eq 3 ]]
 }
 
