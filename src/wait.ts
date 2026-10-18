@@ -3,7 +3,9 @@ import { formatResult } from "./command.ts";
 import type { LouroResult } from "./louro.ts";
 import { formatBatch } from "./view.ts";
 
-export const WAIT_ARGS = ["wait", "--timeout", "60"];
+// MAX_BATCH_BYTES splits its budget across events, so the batch size must stay bounded.
+const MAX_EVENTS = 20;
+export const WAIT_ARGS = ["wait", "--timeout", "60", "--max", String(MAX_EVENTS)];
 const BACKOFF_MS = 5_000;
 
 export const MAX_BATCH_BYTES = 16 * 1024;
