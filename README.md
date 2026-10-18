@@ -47,6 +47,7 @@ the pre-commit hook runs all three.
 - `src/config.ts`: the model, provider and harness settings.
 - `src/tool.ts`, `src/command.ts`, `src/louro.ts`: the `louro` tool, its
   command parser and allowlist, and how louro is run.
+- `src/state.ts`: where the durable state lives; it is private to the user.
 - `src/wait.ts`: turns `louro wait` batches into input for the bot.
 - `src/view.ts`: the live view's lines.
 - `SYSTEM.md`: the bot's personality and IRC etiquette.

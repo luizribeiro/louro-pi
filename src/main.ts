@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createRegistry, Harness, watchEvents } from "@earendil-works/pi-durable";
@@ -9,6 +7,7 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import { formatResult } from "./command.ts";
 import { agentChange, harnessSettings, litellmModels } from "./config.ts";
 import { runLouro } from "./louro.ts";
+import { privateStatePath } from "./state.ts";
 import { louroExtension, louroTool } from "./tool.ts";
 import { formatEvent } from "./view.ts";
 import { forwardEvents, WAIT_ARGS } from "./wait.ts";
@@ -16,11 +15,6 @@ import { forwardEvents, WAIT_ARGS } from "./wait.ts";
 // Margin over wait's own 60s timeout plus its settle time, so only a hung louro gets killed.
 const WAIT_TIMEOUT_MS = 90_000;
 const SYSTEM_PATH = process.env.LOURO_PI_SYSTEM ?? new URL("../SYSTEM.md", import.meta.url);
-
-function statePath(): string {
-	const state = process.env.XDG_STATE_HOME || join(homedir(), ".local", "state");
-	return join(state, "louro-pi", "louro.sqlite");
-}
 
 async function primer(): Promise<string> {
 	const { error, stdout, stderr } = await runLouro(["--help"], 10_000);
@@ -32,10 +26,8 @@ const extension = louroExtension(await readFile(SYSTEM_PATH, "utf8"), await prim
 const registry = createRegistry();
 registry.install(extension);
 
-const path = statePath();
-await mkdir(dirname(path), { recursive: true });
 const harness = await Harness.open(
-	await openNodeSqliteStorage(path),
+	await openNodeSqliteStorage(await privateStatePath()),
 	{
 		models: litellmModels(),
 		registry,
