@@ -34,7 +34,8 @@ export function casefold(name: string): string {
 	return name.replace(/[A-Z]/g, (char) => char.toLowerCase());
 }
 
-const isChannel = (target: string) => /^[#&][^,]*$/.test(target);
+// IRC forbids spaces, commas and control characters in channel names; refuse them here too, not only in louro.
+const isChannel = (target: string) => /^[#&][^,\s\p{Cc}]*$/u.test(target);
 
 /** Finds the target the way clap would, refusing what the table doesn't know. */
 function parseArgs(
