@@ -27,12 +27,18 @@ read -rs 'pw?louro password: '; echo; jq -n --arg p "$pw" '$p' | sops set --valu
 
 Then stop the daemon so the next run connects with it.
 
+## Check
+
+`nix flake check` runs the type check, tests and Biome. In the dev shell,
+`npm run typecheck`, `npm test` and `npm run lint` run them one at a time, and
+the pre-commit hook runs all three.
+
 ## Files
 
 - `louro.toml`: server, channels and grants (what the bot may read and send).
 - `SYSTEM.md`: the bot's personality and IRC etiquette.
 - `live.jq`: turns pi's JSON events into the live view on stdout.
-- `extensions/`: the `louro` tool and its command parser; test with
-  `nix shell nixpkgs#nodejs -c node --experimental-strip-types --test extensions/command.test.ts`.
+- `extensions/`: the `louro` tool for pi.
+- `src/`: the tool's command parser.
 - `agent/`: pi settings and the model definition.
 - `secrets/louro.yaml`: the bot's SASL password, encrypted with sops.

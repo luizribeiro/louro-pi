@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { formatResult, parseCommand } from "./command.ts";
 
 test("splits the primer's commands into louro's argv", () => {
@@ -9,7 +9,11 @@ test("splits the primer's commands into louro's argv", () => {
 });
 
 test("follows sh quoting rules", () => {
-	assert.deepEqual(parseCommand(`louro send "#bots" "it's \\"fine\\", costs \\$5"`), ["send", "#bots", `it's "fine", costs $5`]);
+	assert.deepEqual(parseCommand(`louro send "#bots" "it's \\"fine\\", costs \\$5"`), [
+		"send",
+		"#bots",
+		`it's "fine", costs $5`,
+	]);
 	assert.deepEqual(parseCommand(`louro send maria it\\'s\\ ok`), ["send", "maria", "it's ok"]);
 	assert.deepEqual(parseCommand(`louro send '#bots' 'a; b | c && $(d)'`), ["send", "#bots", "a; b | c && $(d)"]);
 	assert.deepEqual(parseCommand("louro send '#bots' 'line one\nline two'"), ["send", "#bots", "line one\nline two"]);
@@ -66,7 +70,12 @@ test("rejects --socket anywhere", () => {
 
 test("help forms naming connect or quit only print help", () => {
 	assert.deepEqual(parseCommand("louro help connect"), ["help", "connect"]);
-	assert.deepEqual(parseCommand("louro --help connect --config /etc/passwd"), ["--help", "connect", "--config", "/etc/passwd"]);
+	assert.deepEqual(parseCommand("louro --help connect --config /etc/passwd"), [
+		"--help",
+		"connect",
+		"--config",
+		"/etc/passwd",
+	]);
 	assert.deepEqual(parseCommand("louro send -- connect x"), ["send", "--", "connect", "x"]);
 });
 
@@ -91,7 +100,13 @@ test("subcommands are case-sensitive and exact", () => {
 });
 
 test("rejects --socket however it is quoted or escaped, even as text", () => {
-	for (const line of ["louro status '--socket' /x", "louro status --so''cket /x", "louro status --so\\cket=/x", "louro status --socket\t/x", "louro send '#x' -- --socket"]) {
+	for (const line of [
+		"louro status '--socket' /x",
+		"louro status --so''cket /x",
+		"louro status --so\\cket=/x",
+		"louro status --socket\t/x",
+		"louro send '#x' -- --socket",
+	]) {
 		assert.throws(() => parseCommand(line), /--socket is not allowed/, line);
 	}
 });
@@ -107,9 +122,16 @@ test("formats louro's result with a one-line exit status", () => {
 	const sent = '{"sent":true,"target":"#bots"}\n';
 	assert.equal(formatResult(null, sent, ""), 'exit: 0\n{"sent":true,"target":"#bots"}');
 	assert.equal(
-		formatResult({ code: 3, message: "Command failed" }, '{"error":{"code":"no_session"}}\n', "louro: could not reach louro\n"),
+		formatResult(
+			{ code: 3, message: "Command failed" },
+			'{"error":{"code":"no_session"}}\n',
+			"louro: could not reach louro\n",
+		),
 		'exit: 3\n{"error":{"code":"no_session"}}\nlouro: could not reach louro',
 	);
-	assert.equal(formatResult({ code: null, signal: "SIGTERM", message: "Command failed: louro wait\n" }, "", ""), "exit: killed:SIGTERM");
+	assert.equal(
+		formatResult({ code: null, signal: "SIGTERM", message: "Command failed: louro wait\n" }, "", ""),
+		"exit: killed:SIGTERM",
+	);
 	assert.equal(formatResult({ code: "ENOENT", message: "spawn louro ENOENT" }, "", ""), "exit: ENOENT");
 });

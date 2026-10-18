@@ -1,1 +1,4 @@
-.direnv/
+/.direnv
+/node_modules
+/result
+/.pre-commit-config.yaml

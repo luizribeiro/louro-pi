@@ -1,7 +1,7 @@
+import { execFile } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { execFile } from "node:child_process";
-import { formatResult, parseCommand } from "./command.ts";
+import { formatResult, parseCommand } from "../src/command.ts";
 
 const LOURO_BIN = process.env.LOURO_BIN ?? "louro";
 
