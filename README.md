@@ -24,6 +24,11 @@ channel, and a DM's may only send to that person, though it may read channel
 history. The live view prefixes each line with its conversation, like
 `[#bots]` or `[luiz]`; louro's connection reports go only to the live view.
 
+The bot shows itself typing where `irc.typing` in `louro.toml` grants it: for
+a DM or a message that mentions it, from when it starts on it until its reply
+lands; otherwise only while it writes a `louro send`, so it never shows typing
+for a message it won't answer.
+
 The bot remembers its conversations across runs in
 `~/.local/state/louro-pi/louro.sqlite`. Delete that file to reset them.
 
@@ -57,6 +62,8 @@ the pre-commit hook runs all three.
   command parser and allowlist, and how louro is run.
 - `src/state.ts`: where the durable state lives; it is private to the user.
 - `src/wait.ts`: turns `louro wait` batches into input for each conversation.
+- `src/reply.ts`, `src/typing.ts`: when the bot is about to reply, and showing
+  it typing then.
 - `src/conversations.ts`: which conversation an event belongs to, and the
   stored map from each channel or DM partner to its conversation.
 - `src/target.ts`: the check that a command stays within its conversation.

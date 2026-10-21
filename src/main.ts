@@ -15,8 +15,9 @@ import { agentChange, harnessSettings, litellmModels } from "./config.ts";
 import { Conversations, conversationFor, type Route } from "./conversations.ts";
 import { runLouro } from "./louro.ts";
 import { privateStatePath } from "./state.ts";
-import type { Scope } from "./target.ts";
+import { type Scope, targetOf } from "./target.ts";
 import { louroExtension, louroTool } from "./tool.ts";
+import { type TypingIndicator, typingIndicator, typingSender } from "./typing.ts";
 import { formatEvent, labeled } from "./view.ts";
 import { forwardEvents, WAIT_ARGS } from "./wait.ts";
 
@@ -56,27 +57,36 @@ harness.closed.then((end) => {
 	}
 });
 
-const opened = new Map<ConversationId, { conversation: Conversation; scope: Scope }>();
+type Opened = { conversation: Conversation; scope: Scope; typing: TypingIndicator };
 
-async function open(id: ConversationId, scope: Scope): Promise<Conversation> {
+const opened = new Map<ConversationId, Opened>();
+
+async function open(id: ConversationId, scope: Scope): Promise<Opened> {
 	const known = opened.get(id);
 	if (known) {
 		known.scope = scope;
-		return known.conversation;
+		return known;
 	}
 	const conversation = await harness.conversation(id, BACKGROUND_CONTEXT);
 	if (!conversation) throw new Error(`conversation ${id} is missing`);
 	await conversation.configure(agentChange(extension, louroTool), BACKGROUND_CONTEXT);
-	const entry = { conversation, scope };
+	// `entry.scope`, not `scope`: reopening the conversation updates it.
+	const showTyping = typingSender(
+		(state) => runLouro(["typing", targetOf(entry.scope), state], 10_000),
+		(line) => console.error(labeled(entry.scope, line)),
+	);
+	const entry: Opened = { conversation, scope, typing: typingIndicator((state) => void showTyping(state)) };
 	opened.set(id, entry);
 	const events = await watchEvents(harness, id, BACKGROUND_CONTEXT);
+	entry.typing.see([events.snapshot]);
 	events.start(async (batch) => {
 		for (const line of batch.flatMap(formatEvent)) console.log(labeled(entry.scope, line));
+		entry.typing.see(batch);
 	});
-	return conversation;
+	return entry;
 }
 
-async function conversationOf(route: Route): Promise<Conversation> {
+async function conversationOf(route: Route): Promise<Opened> {
 	const id = await harness.commit((tx) => conversationFor(tx, route), BACKGROUND_CONTEXT);
 	return open(id, route.scope);
 }
@@ -90,7 +100,11 @@ await forwardEvents(
 		wait: (signal) => runLouro(WAIT_ARGS, WAIT_TIMEOUT_MS, signal),
 		newId: randomUUID,
 		// Admission is owed once louro handed the batch over, so shutdown must not abort it.
-		submit: async ({ route, input }) => (await conversationOf(route)).submit(input, BACKGROUND_CONTEXT),
+		submit: async ({ route, input, mentionsMe }) => {
+			const { conversation, typing } = await conversationOf(route);
+			const submission = await conversation.submit(input, BACKGROUND_CONTEXT);
+			if (mentionsMe) typing.expect(submission.id);
+		},
 		sleep: (ms, signal) => sleep(ms, undefined, { signal }).catch(() => {}),
 		print: console.log,
 		warn: console.error,

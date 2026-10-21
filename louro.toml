@@ -10,6 +10,7 @@ autojoin = ["#bots"]
 [grants]
 irc.join = ["#bots"]
 irc.send = ["#bots"]
+irc.typing = ["#bots", "account:luiz"]
 irc.dm.read = ["account:luiz"]
 irc.dm.send = ["account:luiz"]
 # For the operator; the louro-pi tool never lets the agent run quit.
