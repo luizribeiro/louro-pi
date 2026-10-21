@@ -48,7 +48,6 @@ test("a channel conversation may target only its own channel, in any case", () =
 		"louro react '#bots' 4y8kq7j2c9mnz '🦜'",
 		"louro react --remove '#bots' 4y8kq7j2c9mnz '🦜'",
 		"louro redact '#bots' 4y8kq7j2c9mnz --reason 'wrong channel'",
-		"louro typing '#bots' active",
 		"louro history '#bots'",
 		"louro history '#bots' --latest 50 --before 2026-10-17T21:04:11Z",
 		"louro history --after=4y8kq7j2c9mnz '#bots'",
@@ -64,7 +63,6 @@ test("a channel conversation may target only its own channel, in any case", () =
 			"louro names '#lounge'",
 			"louro react luiz 4y8kq7j2c9mnz '🦜'",
 			"louro redact maria 4y8kq7j2c9mnz",
-			"louro typing luiz active",
 		],
 		/^this conversation is #bots: louro \w+ may only target #bots here, not /,
 	);
@@ -76,7 +74,6 @@ test("a DM conversation may send only to its partner, and read any channel too",
 		"louro send Luiz hi",
 		"louro react luiz 4y8kq7j2c9mnz '👍'",
 		"louro redact LUIZ 4y8kq7j2c9mnz",
-		"louro typing luiz done",
 		"louro history luiz --latest 10",
 		"louro history '#bots'",
 		"louro history '&local'",
@@ -89,7 +86,6 @@ test("a DM conversation may send only to its partner, and read any channel too",
 			"louro send maria hi",
 			"louro react '#bots' 4y8kq7j2c9mnz '👍'",
 			"louro redact '#bots' 4y8kq7j2c9mnz",
-			"louro typing '#bots' active",
 			"louro history maria",
 			"louro history '#bots,maria'",
 			"louro history '#bots maria'",
@@ -140,7 +136,7 @@ test("refuses unknown flags and malformed values instead of guessing", () => {
 });
 
 test("refuses a missing target", () => {
-	refuses(BOTS, ["louro send", "louro react", "louro redact", "louro typing", "louro history"], /needs a target$/);
+	refuses(BOTS, ["louro send", "louro react", "louro redact", "louro history"], /needs a target$/);
 	refuses(LUIZ, ["louro names", "louro history --latest 5"], /needs a (channel|target)$/);
 });
 

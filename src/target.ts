@@ -18,7 +18,6 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
 	},
 	react: { positionals: ["target", "msgid", "reaction"], flags: { "--remove": false }, reads: false },
 	redact: { positionals: ["target", "msgid"], flags: { "--reason": true }, reads: false },
-	typing: { positionals: ["target", "state"], flags: {}, reads: false },
 	history: {
 		positionals: ["target"],
 		flags: { "--latest": true, "--before": true, "--after": true },

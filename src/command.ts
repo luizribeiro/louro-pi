@@ -1,16 +1,5 @@
-// The commands an agent needs; `connect` and `quit` are the operator's, and the daemon owns `wait` and its cursor.
-const ALLOWED_SUBCOMMANDS = new Set([
-	"status",
-	"send",
-	"react",
-	"redact",
-	"typing",
-	"history",
-	"names",
-	"help",
-	"--help",
-	"-h",
-]);
+// The commands an agent needs; `connect` and `quit` are the operator's, and the daemon owns `wait`, its cursor and `typing`.
+const ALLOWED_SUBCOMMANDS = new Set(["status", "send", "react", "redact", "history", "names", "help", "--help", "-h"]);
 
 const SHELL_OPERATORS = new Set([";", "&", "|", "<", ">", "(", ")", "$", "`", "\n"]);
 

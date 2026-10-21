@@ -56,6 +56,7 @@ test("allows only the agent's subcommands", () => {
 		"louro connect --config /Users/luiz/.ssh/known_hosts",
 		"louro quit",
 		"louro wait --timeout 60",
+		"louro typing '#bots' active",
 		"louro --socket /tmp/x status",
 		"louro --config x connect",
 		"louro conn",
