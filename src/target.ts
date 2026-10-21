@@ -69,6 +69,11 @@ function parseArgs(
 	return { help: false, target: found[0] };
 }
 
+/** The channel or DM partner a conversation talks to. */
+export function targetOf(scope: Scope): string {
+	return scope.kind === "channel" ? scope.name : scope.partner;
+}
+
 function describe(scope: Scope): string {
 	return scope.kind === "channel" ? scope.name : `your DMs with ${scope.partner}`;
 }
@@ -84,7 +89,7 @@ export function checkTarget(scope: Scope, args: string[]): string | undefined {
 	if (parsed.help) return undefined;
 	const { target } = parsed;
 	if (target === undefined) return `louro ${name} needs a ${subcommand.positionals[0]}`;
-	const own = scope.kind === "channel" ? scope.name : scope.partner;
+	const own = targetOf(scope);
 	if (casefold(target) === casefold(own)) return undefined;
 	if (scope.kind === "dm" && subcommand.reads && isChannel(target)) return undefined;
 	const reach = scope.kind === "dm" ? `${own} (history and names may also read a channel)` : own;
