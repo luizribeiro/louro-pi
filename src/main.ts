@@ -90,7 +90,7 @@ await forwardEvents(
 		wait: (signal) => runLouro(WAIT_ARGS, WAIT_TIMEOUT_MS, signal),
 		newId: randomUUID,
 		// Admission is owed once louro handed the batch over, so shutdown must not abort it.
-		submit: async (route, input) => (await conversationOf(route)).submit(input, BACKGROUND_CONTEXT),
+		submit: async ({ route, input }) => (await conversationOf(route)).submit(input, BACKGROUND_CONTEXT),
 		sleep: (ms, signal) => sleep(ms, undefined, { signal }).catch(() => {}),
 		print: console.log,
 		warn: console.error,

@@ -12,7 +12,7 @@ const BACKOFF_MS = 5_000;
 export const MAX_BATCH_BYTES = 16 * 1024;
 export const TRIMMED = "…[trimmed]";
 
-type Event = Parameters<typeof routeOf>[0] & { text?: unknown };
+type Event = Parameters<typeof routeOf>[0] & { text?: unknown; mentions_me?: unknown };
 type Batch = { notice?: string | undefined; events: Event[] };
 
 const utf8Bytes = (text: string) => Buffer.byteLength(text);
@@ -42,7 +42,8 @@ export function renderBatch({ notice, events }: Batch): string {
 	return JSON.stringify({ notice, events: trimmed });
 }
 
-export type Delivery = { route: Route; input: InputSubmissionDraft; count: number };
+/** `mentionsMe` when louro says an event names the bot or is a DM, so a reply is likely. */
+export type Delivery = { route: Route; input: InputSubmissionDraft; count: number; mentionsMe: boolean };
 
 export type WaitStep =
 	| { kind: "submit"; deliveries: Delivery[]; unrouted: Event[] }
@@ -72,6 +73,7 @@ export function nextStep({ error, stdout, stderr }: LouroResult, newId: () => st
 	const deliveries = [...byKey.values()].map(({ route, events }) => ({
 		route,
 		count: events.length,
+		mentionsMe: events.some((event) => event.mentions_me === true),
 		input: {
 			type: "input",
 			content: renderBatch({ notice: batch.notice, events }),
@@ -86,7 +88,7 @@ export function nextStep({ error, stdout, stderr }: LouroResult, newId: () => st
 export type WaitLoop = {
 	wait(signal: AbortSignal): Promise<LouroResult>;
 	newId(): string;
-	submit(route: Route, input: InputSubmissionDraft): Promise<unknown>;
+	submit(delivery: Delivery): Promise<unknown>;
 	sleep(ms: number, signal: AbortSignal): Promise<void>;
 	print(line: string): void;
 	warn(line: string): void;
@@ -99,10 +101,10 @@ export async function forwardEvents(loop: WaitLoop, signal: AbortSignal): Promis
 		await loop.sleep(BACKOFF_MS, signal);
 	};
 	// louro moved its cursor when wait returned, so a batch it handed over must be admitted before waiting again.
-	const submitUntilAdmitted = async ({ route, input }: Delivery) => {
+	const submitUntilAdmitted = async (delivery: Delivery) => {
 		for (;;) {
 			try {
-				await loop.submit(route, input);
+				await loop.submit(delivery);
 				return;
 			} catch (error) {
 				if (signal.aborted) return;

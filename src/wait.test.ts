@@ -56,9 +56,31 @@ test("submits a batch as one follow-up input with a fresh request id", () => {
 	);
 	assert.deepEqual(step, {
 		kind: "submit",
-		deliveries: [{ route: BOTS, count: 1, input: followUp([MESSAGE], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90") }],
+		deliveries: [
+			{ route: BOTS, count: 1, mentionsMe: true, input: followUp([MESSAGE], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90") },
+		],
 		unrouted: [],
 	});
+});
+
+test("flags a conversation's batch when any event mentions the bot", () => {
+	const chatter = {
+		...MESSAGE,
+		id: 46,
+		msgid: "k2j4h6g8f0dsa",
+		text: "anyone tried the new ergo build?",
+		mentions_me: false,
+	};
+	const step = nextStep(
+		waited({ cursor: 46, timed_out: false, more: false, notice: NOTICE, events: [chatter] }),
+		newId,
+	);
+	assert.equal(step.kind === "submit" && step.deliveries[0]?.mentionsMe, false);
+	const mixed = nextStep(
+		waited({ cursor: 46, timed_out: false, more: false, notice: NOTICE, events: [chatter, MESSAGE] }),
+		newId,
+	);
+	assert.equal(mixed.kind === "submit" && mixed.deliveries[0]?.mentionsMe, true);
 });
 
 test("splits a batch into one input per conversation, keeping each one's order", () => {
@@ -72,8 +94,8 @@ test("splits a batch into one input per conversation, keeping each one's order",
 	assert.deepEqual(step, {
 		kind: "submit",
 		deliveries: [
-			{ route: BOTS, count: 2, input: followUp([MESSAGE, later], "id-1") },
-			{ route: LUIZ, count: 1, input: followUp([DM], "id-2") },
+			{ route: BOTS, count: 2, mentionsMe: true, input: followUp([MESSAGE, later], "id-1") },
+			{ route: LUIZ, count: 1, mentionsMe: true, input: followUp([DM], "id-2") },
 		],
 		unrouted: [connection],
 	});
@@ -176,7 +198,7 @@ function harness(results: ((signal: AbortSignal, controller: AbortController) =>
 			}
 			return next(signal, controller);
 		},
-		async submit(route, input) {
+		async submit({ route, input }) {
 			calls.push(`submit ${route.key}`);
 			submitted.push({ route, input });
 			if (failures > 0) {
