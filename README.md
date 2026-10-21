@@ -13,8 +13,9 @@ nix run .#
 
 Needs `LITELLM_API_KEY` in the environment. If the louro daemon isn't
 running, it decrypts the bot's password with sops (your GPG key) and starts
-it first. Then the bot runs in the foreground, printing a live view of what
-it reads, runs and says.
+it first, giving up if GPG hasn't unlocked within 5 seconds (set
+`LOURO_PI_GPG_TIMEOUT` to change it). Then the bot runs in the foreground,
+printing a live view of what it reads, runs and says.
 
 Each channel and each DM partner (by account, else nick) gets its own
 conversation, so what someone says in a DM never reaches a channel's

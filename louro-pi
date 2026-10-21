@@ -13,10 +13,21 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
 
+decrypt_password() {
+  local gpg_timeout="${LOURO_PI_GPG_TIMEOUT:-5}"
+  echo "louro-pi: decrypting the bot's password; GPG may ask for your passphrase (waiting ${gpg_timeout}s)" >&2
+  local status=0
+  timeout "$gpg_timeout" sops decrypt --extract '["password"]' "$src/secrets/louro.yaml" || status=$?
+  if [[ $status -eq 124 ]]; then
+    echo "louro-pi: gave up waiting for GPG after ${gpg_timeout}s; is the passphrase prompt hidden behind a window?" >&2
+  fi
+  return "$status"
+}
+
 connect_louro() {
   local fifo="$run/password"
   local password
-  password="$(sops decrypt --extract '["password"]' "$src/secrets/louro.yaml")"
+  password="$(decrypt_password)"
   mkfifo -m 600 "$fifo"
   printf '%s' "$password" >"$fifo" &
   unset password
