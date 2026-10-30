@@ -2,9 +2,7 @@ import { createModels, createProvider, envApiKeyAuth, type Model, type Models } 
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import type { AgentChange, Extension, HarnessSettings, ToolRegistration } from "@earendil-works/pi-durable";
 
-export const CONTEXT_WINDOW = 65536;
-// Small enough that a compaction leaves room for a few full batches (MAX_BATCH_BYTES) below the blocking threshold.
-export const KEEP_RECENT_TOKENS = 8000;
+export const CONTEXT_WINDOW = 262144;
 
 const PROVIDER = "litellm";
 
@@ -53,8 +51,6 @@ export function harnessSettings(extension: Extension): HarnessSettings {
 		followUpMode: "all",
 		// Long enough to ride out the model server restarting instead of dropping the batch.
 		retry: { maxRetries: 10, maxAgentDelayMs: 5 * 60_000 },
-		// The default background margin starts compacting at 16k tokens in a 64k window, before there is much to cut.
-		compaction: { enabled: true, keepRecentTokens: KEEP_RECENT_TOKENS, backgroundTokens: 16384 },
 	};
 }
 
