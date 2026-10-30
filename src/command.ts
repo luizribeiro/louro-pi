@@ -8,6 +8,7 @@ const ALLOWED_SUBCOMMANDS = new Set([
 	"names",
 	"whois",
 	"whowas",
+	"watch",
 	"help",
 	"--help",
 	"-h",

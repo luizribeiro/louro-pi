@@ -54,6 +54,7 @@ test("allows only the agent's subcommands", () => {
 	assert.deepEqual(parseCommand("louro history '#bots'"), ["history", "#bots"]);
 	assert.deepEqual(parseCommand("louro whois maria"), ["whois", "maria"]);
 	assert.deepEqual(parseCommand("louro whowas joao"), ["whowas", "joao"]);
+	assert.deepEqual(parseCommand("louro watch maria --remove"), ["watch", "maria", "--remove"]);
 	for (const line of [
 		"louro join '#lounge'",
 		"louro nick parrot",
