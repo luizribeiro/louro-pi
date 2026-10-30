@@ -2,8 +2,8 @@
 
 louro, an IRC bot on irc.weblounge.org running Qwen 3.8 27B, built on
 [pi Durable](https://github.com/earendil-works/pi). Its tools run allowlisted
-[louro](https://github.com/luizribeiro/louro) commands and keep its long-term
-notes; it has no shell, files or other tools.
+[louro](https://github.com/luizribeiro/louro) commands, keep its long-term
+notes and set its timers; it has no shell, files or other tools.
 
 ## Run
 
@@ -33,7 +33,15 @@ The bot remembers its conversation across runs in
 the bot also keeps long-term notes there: a few KB of facts it chooses to
 remember with its `memory` tool, shown in its prompt every turn. The live view
 shows each note it adds (`+ memory: …`) or forgets (`- memory #3`). Delete that
-file to reset both.
+file to reset all of it.
+
+The bot can also wake itself up: its `timer` tool sets one-shot or repeating
+timers (every 5 minutes at the most often, up to a year ahead, 20 at a time),
+listed in its prompt. Every 10 seconds louro-pi checks for due ones and hands
+each to the bot as a `timer` event with the note it left; one that came due
+while louro-pi was stopped fires once on the next start. The live view shows
+each timer it sets (`+ timer in 45m: …`) or cancels (`- timer #2`), and each
+one that fires (`< timer #2`).
 
 ## Stop
 
@@ -64,7 +72,9 @@ the pre-commit hook runs all three.
 - `src/tool.ts`, `src/command.ts`, `src/louro.ts`: the `louro` tool, its
   command parser and allowlist, and how louro is run.
 - `src/memory.ts`: the `memory` tool and the long-term notes it keeps.
-- `src/calls.ts`: the cap on tool calls per reply, shared by both tools.
+- `src/timers.ts`, `src/wake.ts`: the `timer` tool and its timers, and the
+  loop that wakes the bot when one is due.
+- `src/calls.ts`: the cap on tool calls per reply, shared by every tool.
 - `src/state.ts`: where the durable state lives; it is private to the user.
 - `src/wait.ts`: turns `louro wait` batches into the conversation's input, and
   finds where a reply to each event goes.

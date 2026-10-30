@@ -4,6 +4,7 @@ import { capCalls, failure } from "./calls.ts";
 import { formatResult, parseCommand } from "./command.ts";
 import { runLouro } from "./louro.ts";
 import { memorySection, memoryTool } from "./memory.ts";
+import { timersSection, timerTool } from "./timers.ts";
 
 const TIMEOUT_MS = 60_000;
 export const WAIT_NOTE =
@@ -39,7 +40,7 @@ export function louroExtension(system: string, primer: string) {
 	const prompt = [system.trim(), primer.trim(), WAIT_NOTE, ROOM_NOTE].join("\n\n");
 	return defineExtension({
 		name: "louro",
-		tools: [louroTool, memoryTool],
-		sections: [section("prompt", () => prompt, { tag: false }), memorySection],
+		tools: [louroTool, memoryTool, timerTool],
+		sections: [section("prompt", () => prompt, { tag: false }), memorySection, timersSection],
 	});
 }

@@ -4,6 +4,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type ConversationId, LiveDoc, type SubmissionId, type TaskId } from "@earendil-works/pi-durable";
 import { CALLS_BEFORE_ENDING_RUN, MAX_CALLS_PER_RUN, TOO_MANY_CALLS } from "./calls.ts";
 import { memorySection } from "./memory.ts";
+import { timersSection } from "./timers.ts";
 import { louroExtension, louroTool, ROOM_NOTE, WAIT_NOTE } from "./tool.ts";
 
 const SYSTEM = "You are louro, a bot on IRC.\n";
@@ -24,15 +25,16 @@ async function refusal(command: string, api: ReturnType<typeof inNewRun>) {
 	return JSON.stringify(result.output);
 }
 
-test("the extension has the louro and memory tools, an untagged prompt, then the memory", async () => {
+test("the extension has the louro, memory and timer tools, an untagged prompt, then the memory and timers", async () => {
 	const extension = louroExtension(SYSTEM, PRIMER);
 	assert.deepEqual(
 		extension.tools?.map((tool) => tool.name),
-		["louro", "memory"],
+		["louro", "memory", "timer"],
 	);
-	const [prompt, memory, ...rest] = extension.sections ?? [];
+	const [prompt, memory, timers, ...rest] = extension.sections ?? [];
 	assert.equal(rest.length, 0);
 	assert.equal(memory, memorySection);
+	assert.equal(timers, timersSection);
 	assert.equal(prompt?.tag, false);
 	const input = { conversationId: 1 as ConversationId } as Parameters<NonNullable<typeof prompt>["render"]>[0];
 	assert.equal(
