@@ -1,37 +1,66 @@
 import type { AgentEvent, SubmissionId } from "@earendil-works/pi-durable";
+import { parseCommand } from "./command.ts";
+import { casefold } from "./target.ts";
 
 type Block = { type: string; arguments?: { command?: unknown } };
 
-const isSend = (command: unknown) => typeof command === "string" && /^\s*louro\s+send\b/.test(command);
 const commandOf = (block: Block) => (block.type === "toolCall" ? String(block.arguments?.command ?? "") : "");
+
+/** A command's words, closing a quote a half-written command left open. */
+function wordsOf(command: string): string[] | undefined {
+	for (const closing of ["", "'", '"']) {
+		try {
+			return parseCommand(command + closing);
+		} catch {}
+	}
+	return undefined;
+}
+
+/** Where a `louro send` goes, casefolded; only once its text has begun, so a half-written target never counts. */
+export function sendTarget(command: unknown): string | undefined {
+	if (typeof command !== "string") return undefined;
+	const [name, ...args] = wordsOf(command) ?? [];
+	if (name !== "send") return undefined;
+	const positionals: string[] = [];
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i] as string;
+		if (arg === "--reply-to") i++;
+		else if (!arg.startsWith("-")) positionals.push(arg);
+	}
+	const [target] = positionals;
+	return target !== undefined && positionals.length > 1 ? casefold(target) : undefined;
+}
 
 export type ReplyTracker = {
 	/**
-	 * Marks an input that asks for a reply, like a DM or a mention, so its run counts as replying from the start. Each
-	 * input louro-pi submits is a follow-up, so it gets a run of its own, whose end forgets it.
+	 * Marks an input that asks for a reply in `targets`, like a DM or a mention, so its run counts as replying there
+	 * from the start. Each input louro-pi submits is a follow-up, so it gets a run of its own, whose end forgets it.
 	 */
-	expect(id: SubmissionId): void;
+	expect(id: SubmissionId, targets: readonly string[]): void;
 	see(event: AgentEvent): void;
-	/** Whether the bot is about to say something: in a run for an expected input until it first sends, or writing a send. */
-	readonly replying: boolean;
+	/**
+	 * Where the bot is about to say something, casefolded: an expected input's targets while its run hasn't sent there,
+	 * and wherever it's writing or running a send.
+	 */
+	readonly replyingTo: ReadonlySet<string>;
 };
 
 export function replyTracker(): ReplyTracker {
-	const expected = new Set<SubmissionId>();
+	const expected = new Map<SubmissionId, Set<string>>();
 	let run: readonly SubmissionId[] | undefined;
-	let replied = false;
+	const replied = new Set<string>();
 	const commands = new Map<number, string>();
-	const sends = new Set<string>();
+	const sends = new Map<string, string>();
 
 	const reset = (inputs: readonly SubmissionId[] | undefined) => {
 		run = inputs;
-		replied = false;
+		replied.clear();
 		commands.clear();
 		sends.clear();
 	};
 
 	return {
-		expect: (id) => void expected.add(id),
+		expect: (id, targets) => void expected.set(id, new Set(targets.map(casefold))),
 		see(event) {
 			switch (event.type) {
 				case "run_start":
@@ -57,21 +86,26 @@ export function replyTracker(): ReplyTracker {
 						}
 					}
 					return;
-				case "tool_execution_start":
-					if (!isSend(event.args.command)) return;
-					sends.add(event.toolCallId);
+				case "tool_execution_start": {
+					const target = sendTarget(event.args.command);
+					if (target !== undefined) sends.set(event.toolCallId, target);
 					return;
-				case "tool_execution_end":
-					if (!sends.delete(event.toolCallId)) return;
-					replied = true;
+				}
+				case "tool_execution_end": {
+					const target = sends.get(event.toolCallId);
+					if (target === undefined) return;
+					sends.delete(event.toolCallId);
+					replied.add(target);
 					commands.clear();
 					return;
+				}
 			}
 		},
-		get replying() {
-			if (run === undefined) return false;
-			const writing = sends.size > 0 || [...commands.values()].some(isSend);
-			return writing || (!replied && run.some((id) => expected.has(id)));
+		get replyingTo() {
+			if (run === undefined) return new Set<string>();
+			const awaited = run.flatMap((id) => [...(expected.get(id) ?? [])]).filter((target) => !replied.has(target));
+			const writing = [...commands.values()].flatMap((command) => sendTarget(command) ?? []);
+			return new Set([...awaited, ...writing, ...sends.values()]);
 		},
 	};
 }

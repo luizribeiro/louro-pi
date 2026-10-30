@@ -12,16 +12,20 @@ const send = (id: string): AgentEvent[] => [
 	{ type: "tool_execution_end", toolCallId: id, toolName: "louro" },
 ];
 
+/** Shows `#bots`'s states bare, and other targets' as `target state`. */
 function watch() {
 	mock.timers.enable({ apis: ["setInterval"] });
-	const shown: TypingState[] = [];
-	return { shown, typing: typingIndicator((state) => shown.push(state)) };
+	const shown: string[] = [];
+	return {
+		shown,
+		typing: typingIndicator((target, state) => shown.push(target === "#bots" ? state : `${target} ${state}`)),
+	};
 }
 
 test("shows typing while a reply is coming, renewing it until the reply lands", (t) => {
 	t.after(() => mock.timers.reset());
 	const { shown, typing } = watch();
-	typing.expect(MENTION);
+	typing.expect(MENTION, ["#bots"]);
 	typing.see([runStart, { type: "turn_start" }]);
 	assert.deepEqual(shown, ["active"]);
 	mock.timers.tick(TYPING_REFRESH_MS * 2);
@@ -38,7 +42,7 @@ test("starts typing as soon as a running input turns out to be a mention", (t) =
 	const { shown, typing } = watch();
 	typing.see([runStart]);
 	assert.deepEqual(shown, []);
-	typing.expect(MENTION);
+	typing.expect(MENTION, ["#bots"]);
 	assert.deepEqual(shown, ["active"]);
 	typing.see([runEnd]);
 	assert.deepEqual(shown, ["active", "done"]);
@@ -47,7 +51,7 @@ test("starts typing as soon as a running input turns out to be a mention", (t) =
 test("a reply that starts and lands in one batch shows nothing", (t) => {
 	t.after(() => mock.timers.reset());
 	const { shown, typing } = watch();
-	typing.expect(MENTION);
+	typing.expect(MENTION, ["#bots"]);
 	typing.see([runStart, ...send("call_1"), runEnd]);
 	mock.timers.tick(TYPING_REFRESH_MS);
 	assert.deepEqual(shown, []);
@@ -62,6 +66,27 @@ test("a run that won't reply never shows typing", (t) => {
 	assert.deepEqual(shown, []);
 });
 
+test("shows typing in each target on its own, renewing only the ones still coming", (t) => {
+	t.after(() => mock.timers.reset());
+	const { shown, typing } = watch();
+	typing.expect(MENTION, ["luiz"]);
+	typing.see([runStart]);
+	typing.see([
+		{
+			type: "tool_execution_start",
+			toolCallId: "call_1",
+			toolName: "louro",
+			args: { command: "louro send '#bots' 'luiz: on it'" },
+		},
+	]);
+	assert.deepEqual(shown, ["luiz active", "active"]);
+	typing.see([{ type: "tool_execution_end", toolCallId: "call_1", toolName: "louro" }]);
+	mock.timers.tick(TYPING_REFRESH_MS);
+	assert.deepEqual(shown, ["luiz active", "active", "done", "luiz active"]);
+	typing.see([runEnd]);
+	assert.deepEqual(shown, ["luiz active", "active", "done", "luiz active", "luiz done"]);
+});
+
 const ok: LouroResult = { error: null, stdout: '{"ok":true}', stderr: "" };
 
 function refusal(code: number, kind: string, message: string): LouroResult {
@@ -73,16 +98,16 @@ function refusal(code: number, kind: string, message: string): LouroResult {
 }
 
 function sender(results: LouroResult[]) {
-	const ran: TypingState[] = [];
+	const ran: string[] = [];
 	const warned: string[] = [];
-	const send = typingSender(
-		async (state) => {
-			ran.push(state);
+	const sendTo = typingSender(
+		async (target, state) => {
+			ran.push(target === "#bots" ? state : `${target} ${state}`);
 			return results.shift() ?? ok;
 		},
 		(line) => warned.push(line),
 	);
-	return { ran, warned, send };
+	return { ran, warned, sendTo, send: (state: TypingState) => sendTo("#bots", state) };
 }
 
 test("sends each state quietly while louro accepts them", async () => {
@@ -105,7 +130,7 @@ test("gives up after louro refuses typing for good, warning once", async () => {
 		await send("done");
 		assert.deepEqual(ran, ["active"]);
 		assert.equal(warned.length, 1);
-		assert.match(warned[0] as string, /^! typing active failed, giving up: exit: \d\n/);
+		assert.match(warned[0] as string, /^! typing active in #bots failed, giving up: exit: \d\n/);
 		assert.ok(warned[0]?.endsWith(result.stderr), warned[0]);
 	}
 });
@@ -117,7 +142,7 @@ test("keeps trying through a dropped connection", async () => {
 	await send("done");
 	assert.deepEqual(ran, ["active", "active", "done"]);
 	assert.deepEqual(warned, [
-		'! typing active failed: exit: 4\n{"error":{"code":"disconnected","message":"not connected to IRC"}}\nlouro: not connected to IRC',
+		'! typing active in #bots failed: exit: 4\n{"error":{"code":"disconnected","message":"not connected to IRC"}}\nlouro: not connected to IRC',
 	]);
 });
 
@@ -125,14 +150,14 @@ test("sends states in order even when one is slow", async () => {
 	const ran: string[] = [];
 	const slowActive = Promise.withResolvers<LouroResult>();
 	const send = typingSender(
-		(state) => {
+		(_target, state) => {
 			ran.push(`start ${state}`);
 			return state === "active" ? slowActive.promise : Promise.resolve(ok);
 		},
 		() => {},
 	);
-	const active = send("active");
-	const done = send("done");
+	const active = send("#bots", "active");
+	const done = send("#bots", "done");
 	await Promise.resolve();
 	assert.deepEqual(ran, ["start active"]);
 	slowActive.resolve(ok);
@@ -145,4 +170,15 @@ test("overlapping sends after a refusal warn once", async () => {
 	await Promise.all([send("active"), send("active"), send("done")]);
 	assert.deepEqual(ran, ["active"]);
 	assert.equal(warned.length, 1);
+});
+
+test("a refusal in one target leaves the others typing", async () => {
+	const { ran, warned, sendTo } = sender([refusal(5, "not_allowed", "irc.typing does not grant #lounge")]);
+	await sendTo("#lounge", "active");
+	await sendTo("#bots", "active");
+	await sendTo("#lounge", "active");
+	await sendTo("#bots", "done");
+	assert.deepEqual(ran, ["#lounge active", "active", "done"]);
+	assert.equal(warned.length, 1);
+	assert.match(warned[0] as string, /^! typing active in #lounge failed, giving up/);
 });

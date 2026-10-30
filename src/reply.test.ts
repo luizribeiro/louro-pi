@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AgentEvent, SubmissionId } from "@earendil-works/pi-durable";
-import { replyTracker } from "./reply.ts";
+import { replyTracker, sendTarget } from "./reply.ts";
 
 const MENTION = 41 as SubmissionId;
 const CHATTER = 42 as SubmissionId;
@@ -50,13 +50,16 @@ function snapshot(...inputs: SubmissionId[]): AgentEvent {
 	} as unknown as AgentEvent;
 }
 
-/** `replying` after each event, in order. */
-function follow(events: AgentEvent[], expected: SubmissionId[] = []): boolean[] {
+const B = "#bots";
+const NONE = "";
+
+/** Where the bot is replying after each event, in order, as a sorted comma-separated list. */
+function follow(events: AgentEvent[], expected: SubmissionId[] = [], targets = ["#Bots"]): string[] {
 	const tracker = replyTracker();
-	for (const id of expected) tracker.expect(id);
+	for (const id of expected) tracker.expect(id, targets);
 	return events.map((event) => {
 		tracker.see(event);
-		return tracker.replying;
+		return [...tracker.replyingTo].sort().join();
 	});
 }
 
@@ -74,7 +77,7 @@ test("a run for a mention replies from its start until its first send lands", ()
 			],
 			[MENTION],
 		),
-		[true, true, true, false, false, false, false],
+		[B, B, B, NONE, NONE, NONE, NONE],
 	);
 });
 
@@ -91,7 +94,7 @@ test("other runs reply only while the model writes and runs a send", () => {
 			execEnd("call_1"),
 			runEnd(CHATTER),
 		]),
-		[false, false, false, false, true, true, true, false, false],
+		[NONE, NONE, NONE, NONE, B, B, B, NONE, NONE],
 	);
 });
 
@@ -106,7 +109,7 @@ test("a run that only reads never replies", () => {
 			callDelta(2, "louro names '#bots'"),
 			runEnd(CHATTER),
 		]),
-		[false, false, false, false, false, false, false],
+		[NONE, NONE, NONE, NONE, NONE, NONE, NONE],
 	);
 });
 
@@ -120,38 +123,38 @@ test("spots a send in a tool call that arrives whole", () => {
 				block: { type: "toolCall", id: "call_1", name: "louro", arguments: { command: "louro send '#bots' hi" } },
 			}),
 		]),
-		[false, true],
+		[NONE, B],
 	);
 });
 
 test("a mention's run counts as replying even when it's marked after the run started", () => {
 	const tracker = replyTracker();
 	tracker.see(runStart(MENTION));
-	assert.equal(tracker.replying, false);
-	tracker.expect(MENTION);
-	assert.equal(tracker.replying, true);
+	assert.deepEqual([...tracker.replyingTo], []);
+	tracker.expect(MENTION, ["#bots"]);
+	assert.deepEqual([...tracker.replyingTo], ["#bots"]);
 });
 
 test("a mention queued behind another run waits for its own run", () => {
 	assert.deepEqual(follow([runStart(CHATTER), runEnd(CHATTER), runStart(MENTION), runEnd(MENTION)], [MENTION]), [
-		false,
-		false,
-		true,
-		false,
+		NONE,
+		NONE,
+		B,
+		NONE,
 	]);
 });
 
 test("a run that ends without sending stops replying", () => {
 	assert.deepEqual(follow([runStart(MENTION), callStart(1, "louro send '#bots' 'hm'"), runEnd(MENTION)], [MENTION]), [
-		true,
-		true,
-		false,
+		B,
+		B,
+		NONE,
 	]);
 });
 
 test("a snapshot resumes a mention's run, and a later one with no run ends it", () => {
-	assert.deepEqual(follow([snapshot(MENTION), snapshot()], [MENTION]), [true, false]);
-	assert.deepEqual(follow([snapshot(CHATTER), snapshot()]), [false, false]);
+	assert.deepEqual(follow([snapshot(MENTION), snapshot()], [MENTION]), [B, NONE]);
+	assert.deepEqual(follow([snapshot(CHATTER), snapshot()]), [NONE, NONE]);
 });
 
 test("a snapshot of the same run keeps what the run already did", () => {
@@ -160,7 +163,7 @@ test("a snapshot of the same run keeps what the run already did", () => {
 			[runStart(MENTION), execStart("call_1", "louro send '#bots' 'yes'"), execEnd("call_1"), snapshot(MENTION)],
 			[MENTION],
 		),
-		[true, true, false, false],
+		[B, B, NONE, NONE],
 	);
 });
 
@@ -176,7 +179,7 @@ test("a retry that drops a half-written send stops replying", () => {
 			{ type: "message_end" } as AgentEvent,
 			runEnd(CHATTER),
 		]),
-		[false, true, true, true, false, false, false, false],
+		[NONE, B, B, B, NONE, NONE, NONE, NONE],
 	);
 });
 
@@ -192,6 +195,45 @@ test("keeps replying until the last of two sends lands", () => {
 			execEnd("call_1"),
 			execEnd("call_2"),
 		]),
-		[false, true, true, true, true, true, true, false],
+		[NONE, B, B, B, B, B, B, NONE],
 	);
+});
+
+test("a DM's run keeps replying to its sender after a send elsewhere", () => {
+	assert.deepEqual(
+		follow(
+			[
+				runStart(MENTION),
+				execStart("call_1", "louro send '#bots' 'luiz asked me something'"),
+				execEnd("call_1"),
+				execStart("call_2", "louro send luiz 'done, see #bots'"),
+				execEnd("call_2"),
+			],
+			[MENTION],
+			["Luiz"],
+		),
+		["luiz", "#bots,luiz", "luiz", "luiz", NONE],
+	);
+});
+
+test("shows a send's target only once its text has begun", () => {
+	assert.deepEqual(
+		follow([runStart(CHATTER), callStart(1), callDelta(1, "louro send '#lou"), callDelta(1, "nge' 'mari")]),
+		[NONE, NONE, NONE, "#lounge"],
+	);
+});
+
+test("finds a send's target past its flags and quotes, casefolded", () => {
+	const cases: [unknown, string | undefined][] = [
+		["louro send '#Bots' 'hi'", "#bots"],
+		["louro send --reply-to 4y8kq7j2c9mnz Luiz 'yes'", "luiz"],
+		["louro send --action '#bots' \"waves at maria", "#bots"],
+		["louro send --reply-to=4y8kq7j2c9mnz '#bots' 'yes'", "#bots"],
+		["louro send '#bots' ", undefined],
+		["louro send '#bo", undefined],
+		["louro history '#bots' --latest 5", undefined],
+		["louro status; louro send '#bots' 'hi'", undefined],
+		[undefined, undefined],
+	];
+	for (const [command, target] of cases) assert.equal(sendTarget(command), target, String(command));
 });

@@ -70,12 +70,16 @@ async function open(id: ConversationId, scope: Scope): Promise<Opened> {
 	const conversation = await harness.conversation(id, BACKGROUND_CONTEXT);
 	if (!conversation) throw new Error(`conversation ${id} is missing`);
 	await conversation.configure(agentChange(extension, louroTool), BACKGROUND_CONTEXT);
-	// `entry.scope`, not `scope`: reopening the conversation updates it.
 	const showTyping = typingSender(
-		(state) => runLouro(["typing", targetOf(entry.scope), state], 10_000),
+		(target, state) => runLouro(["typing", target, state], 10_000),
+		// `entry.scope`, not `scope`: reopening the conversation updates it.
 		(line) => console.error(labeled(entry.scope, line)),
 	);
-	const entry: Opened = { conversation, scope, typing: typingIndicator((state) => void showTyping(state)) };
+	const entry: Opened = {
+		conversation,
+		scope,
+		typing: typingIndicator((target, state) => void showTyping(target, state)),
+	};
 	opened.set(id, entry);
 	const events = await watchEvents(harness, id, BACKGROUND_CONTEXT);
 	entry.typing.see([events.snapshot]);
@@ -103,7 +107,7 @@ await forwardEvents(
 		submit: async ({ route, input, mentionsMe }) => {
 			const { conversation, typing } = await conversationOf(route);
 			const submission = await conversation.submit(input, BACKGROUND_CONTEXT);
-			if (mentionsMe) typing.expect(submission.id);
+			if (mentionsMe) typing.expect(submission.id, [targetOf(route.scope)]);
 		},
 		sleep: (ms, signal) => sleep(ms, undefined, { signal }).catch(() => {}),
 		print: console.log,
