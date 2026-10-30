@@ -56,6 +56,16 @@ test("shows the command the model ran and its result on one line", () => {
 	assert.deepEqual(formatEvent({ type: "tool_execution_end", ...call }), []);
 });
 
+test("shows each note the model remembers or forgets", () => {
+	const edit = { remember: ["luiz is building\nwasm-junction"], forget: [3, 5] };
+	assert.deepEqual(formatEvent({ type: "tool_execution_start", ...call, toolName: "memory", args: edit }), [
+		"- memory #3",
+		"- memory #5",
+		"+ memory: luiz is building wasm-junction",
+	]);
+	assert.deepEqual(formatEvent({ type: "tool_execution_start", ...call, toolName: "memory", args: {} }), []);
+});
+
 test("shows the model's final text but not its thinking or tool calls", () => {
 	assert.deepEqual(
 		formatEvent(

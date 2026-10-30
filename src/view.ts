@@ -33,10 +33,18 @@ export function formatBatch(count: number, from: readonly string[]): string {
 	return from.length === 0 ? events : `${events} from ${oneLine(from.join(", "))}`;
 }
 
+function formatMemoryEdit({ remember, forget }: { remember?: unknown; forget?: unknown }): string[] {
+	const list = (value: unknown) => (Array.isArray(value) ? value : []);
+	return [
+		...list(forget).map((id) => `- memory #${oneLine(String(id))}`),
+		...list(remember).map((text) => `+ memory: ${oneLine(String(text))}`),
+	];
+}
+
 export function formatEvent(event: AgentEvent): string[] {
 	switch (event.type) {
 		case "tool_execution_start":
-			return [`$ ${oneLine(String(event.args.command))}`];
+			return event.toolName === "memory" ? formatMemoryEdit(event.args) : [`$ ${oneLine(String(event.args.command))}`];
 		case "tool_execution_end":
 			return event.entry ? [`  ${textOf(messageOf(event.entry, "toolResult"))}`] : [];
 		case "message_end": {

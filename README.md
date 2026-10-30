@@ -31,7 +31,8 @@ channel or DM partner that mentioned it, or the target of the send.
 The bot remembers its conversation across runs in
 `~/.local/state/louro-pi/louro.sqlite`. Older chat in it gets summarized, so
 the bot also keeps long-term notes there: a few KB of facts it chooses to
-remember with its `memory` tool, shown in its prompt every turn. Delete that
+remember with its `memory` tool, shown in its prompt every turn. The live view
+shows each note it adds (`+ memory: …`) or forgets (`- memory #3`). Delete that
 file to reset both.
 
 ## Stop
