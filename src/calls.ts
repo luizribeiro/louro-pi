@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord/context";
-import { LiveDoc, type ToolExecutionApi, type ToolExecutionResult } from "@earendil-works/pi-durable";
+import { LiveDoc, type ToolExecutionApi, type ToolExecutionResult, type Tx } from "@earendil-works/pi-durable";
 
 export const MAX_CALLS_PER_RUN = 8;
 export const CALLS_BEFORE_ENDING_RUN = MAX_CALLS_PER_RUN + 4;
@@ -30,4 +30,20 @@ export async function capCalls(api: ToolExecutionApi, context: Context): Promise
 	if (verdict === "refuse") return failure(TOO_MANY_CALLS);
 	if (verdict === "end") return { ...failure(TOO_MANY_CALLS), control: { terminate: true } };
 	return undefined;
+}
+
+/** Runs a capped edit of the bot's own state in one commit; its text, or why it changed nothing, is the result. */
+export async function commitEdit(
+	api: ToolExecutionApi,
+	context: Context,
+	edit: (tx: Tx) => Promise<string>,
+): Promise<ToolExecutionResult> {
+	const capped = await capCalls(api, context);
+	if (capped) return capped;
+	try {
+		const text = await api.commit(edit, context);
+		return { output: [{ type: "text", text }], isError: false };
+	} catch (error) {
+		return failure((error as Error).message);
+	}
 }

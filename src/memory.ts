@@ -1,6 +1,6 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineDoc, defineTool, section } from "@earendil-works/pi-durable";
-import { capCalls, failure } from "./calls.ts";
+import { commitEdit } from "./calls.ts";
 
 export type Note = { id: number; text: string; at: string };
 type Memory = { notes: Note[]; nextId: number };
@@ -65,17 +65,6 @@ export const memoryTool = defineTool({
 		remember: Type.Optional(Type.Array(Type.String(), { description: "New notes, one fact each" })),
 		forget: Type.Optional(Type.Array(Type.Integer(), { description: "Ids of notes to drop, like 3 for #3" })),
 	}),
-	async execute(edit, api, context) {
-		const capped = await capCalls(api, context);
-		if (capped) return capped;
-		try {
-			const text = await api.commit(
-				async (tx) => editMemory(await tx.doc(Memory), edit, new Date().toISOString()),
-				context,
-			);
-			return { output: [{ type: "text", text }], isError: false };
-		} catch (error) {
-			return failure((error as Error).message);
-		}
-	},
+	execute: (edit, api, context) =>
+		commitEdit(api, context, async (tx) => editMemory(await tx.doc(Memory), edit, new Date().toISOString())),
 });
