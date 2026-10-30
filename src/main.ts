@@ -9,10 +9,12 @@ import { agentChange, harnessSettings, litellmModels } from "./config.ts";
 import { botConversation } from "./conversations.ts";
 import { runLouro } from "./louro.ts";
 import { privateStatePath } from "./state.ts";
+import { advanceTimers, Timers } from "./timers.ts";
 import { louroExtension } from "./tool.ts";
 import { typingIndicator, typingSender } from "./typing.ts";
 import { formatEvent } from "./view.ts";
 import { forwardEvents, WAIT_ARGS } from "./wait.ts";
+import { wakeForTimers } from "./wake.ts";
 
 // Margin over wait's own 60s timeout plus its settle time, so only a hung louro gets killed.
 const WAIT_TIMEOUT_MS = 90_000;
@@ -64,7 +66,9 @@ events.start(async (batch) => {
 });
 harness.resume();
 
-await forwardEvents(
+const pause = (ms: number, signal: AbortSignal) => sleep(ms, undefined, { signal }).catch(() => {});
+
+const forwarding = forwardEvents(
 	{
 		wait: (signal) => runLouro(WAIT_ARGS, WAIT_TIMEOUT_MS, signal),
 		newId: randomUUID,
@@ -73,10 +77,24 @@ await forwardEvents(
 			const submission = await conversation.submit(input, BACKGROUND_CONTEXT);
 			if (replyTargets.length > 0) typing.expect(submission.id, replyTargets);
 		},
-		sleep: (ms, signal) => sleep(ms, undefined, { signal }).catch(() => {}),
+		sleep: pause,
 		print: console.log,
 		warn: console.error,
 	},
 	shutdown.signal,
 );
+const waking = wakeForTimers(
+	{
+		timers: async () => (await harness.snapshot(Timers, BACKGROUND_CONTEXT))?.timers ?? [],
+		submit: (input) => conversation.submit(input, BACKGROUND_CONTEXT),
+		advance: (fired, now) =>
+			harness.commit(async (tx) => advanceTimers(await tx.doc(Timers), fired, now), BACKGROUND_CONTEXT),
+		now: Date.now,
+		sleep: pause,
+		print: console.log,
+		warn: console.error,
+	},
+	shutdown.signal,
+);
+await Promise.all([forwarding, waking]);
 await harness.close(BACKGROUND_CONTEXT);
