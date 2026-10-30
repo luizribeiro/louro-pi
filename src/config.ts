@@ -1,6 +1,6 @@
 import { createModels, createProvider, envApiKeyAuth, type Model, type Models } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import type { AgentChange, Extension, HarnessSettings, ToolRegistration } from "@earendil-works/pi-durable";
+import type { AgentChange, Extension, HarnessSettings } from "@earendil-works/pi-durable";
 
 export const CONTEXT_WINDOW = 262144;
 
@@ -54,11 +54,11 @@ export function harnessSettings(extension: Extension): HarnessSettings {
 	};
 }
 
-export function agentChange(extension: Extension, tool: ToolRegistration): AgentChange {
+export function agentChange(extension: Extension): AgentChange {
 	return {
 		model: { provider: PROVIDER, modelId: MODEL.id },
 		thinkingLevel: "medium",
 		extensions: [extension],
-		tools: [tool],
+		tools: [...(extension.tools ?? [])],
 	};
 }

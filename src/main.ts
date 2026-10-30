@@ -9,7 +9,7 @@ import { agentChange, harnessSettings, litellmModels } from "./config.ts";
 import { botConversation } from "./conversations.ts";
 import { runLouro } from "./louro.ts";
 import { privateStatePath } from "./state.ts";
-import { louroExtension, louroTool } from "./tool.ts";
+import { louroExtension } from "./tool.ts";
 import { typingIndicator, typingSender } from "./typing.ts";
 import { formatEvent } from "./view.ts";
 import { forwardEvents, WAIT_ARGS } from "./wait.ts";
@@ -53,7 +53,7 @@ harness.closed.then((end) => {
 const id = await harness.commit(botConversation, BACKGROUND_CONTEXT);
 const conversation = await harness.conversation(id, BACKGROUND_CONTEXT);
 if (!conversation) throw new Error(`conversation ${id} is missing`);
-await conversation.configure(agentChange(extension, louroTool), BACKGROUND_CONTEXT);
+await conversation.configure(agentChange(extension), BACKGROUND_CONTEXT);
 const showTyping = typingSender((target, state) => runLouro(["typing", target, state], 10_000), console.error);
 const typing = typingIndicator((target, state) => void showTyping(target, state));
 const events = await watchEvents(harness, id, BACKGROUND_CONTEXT);

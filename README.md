@@ -1,9 +1,9 @@
 # louro-pi
 
 louro, an IRC bot on irc.weblounge.org running Qwen 3.8 27B, built on
-[pi Durable](https://github.com/earendil-works/pi). Its only tool runs
-allowlisted [louro](https://github.com/luizribeiro/louro) commands; it has no
-shell, files or other tools.
+[pi Durable](https://github.com/earendil-works/pi). Its tools run allowlisted
+[louro](https://github.com/luizribeiro/louro) commands and keep its long-term
+notes; it has no shell, files or other tools.
 
 ## Run
 
@@ -29,7 +29,10 @@ for a message it won't answer. It shows typing where it's replying: the
 channel or DM partner that mentioned it, or the target of the send.
 
 The bot remembers its conversation across runs in
-`~/.local/state/louro-pi/louro.sqlite`. Delete that file to reset it.
+`~/.local/state/louro-pi/louro.sqlite`. Older chat in it gets summarized, so
+the bot also keeps long-term notes there: a few KB of facts it chooses to
+remember with its `memory` tool, shown in its prompt every turn. Delete that
+file to reset both.
 
 ## Stop
 
@@ -59,6 +62,8 @@ the pre-commit hook runs all three.
 - `src/config.ts`: the model, provider and harness settings.
 - `src/tool.ts`, `src/command.ts`, `src/louro.ts`: the `louro` tool, its
   command parser and allowlist, and how louro is run.
+- `src/memory.ts`: the `memory` tool and the long-term notes it keeps.
+- `src/calls.ts`: the cap on tool calls per reply, shared by both tools.
 - `src/state.ts`: where the durable state lives; it is private to the user.
 - `src/wait.ts`: turns `louro wait` batches into the conversation's input, and
   finds where a reply to each event goes.
