@@ -1,30 +1,10 @@
 import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, defineTool, LiveDoc, section, type ToolExecutionResult } from "@earendil-works/pi-durable";
+import { defineExtension, defineTool, section } from "@earendil-works/pi-durable";
+import { capCalls, failure } from "./calls.ts";
 import { formatResult, parseCommand } from "./command.ts";
 import { runLouro } from "./louro.ts";
 
 const TIMEOUT_MS = 60_000;
-export const MAX_CALLS_PER_RUN = 8;
-export const CALLS_BEFORE_ENDING_RUN = MAX_CALLS_PER_RUN + 4;
-export const TOO_MANY_CALLS = "too many louro calls this turn; reply in text without tools";
-
-export type CallVerdict = "run" | "refuse" | "end";
-
-/** Counts a run's calls; past the cap they are refused, and a model that keeps calling gets its run ended. */
-export function callCounter(): (run: string) => CallVerdict {
-	let current = { run: "", calls: 0 };
-	return (run) => {
-		current = { run, calls: current.run === run ? current.calls + 1 : 1 };
-		return current.calls <= MAX_CALLS_PER_RUN ? "run" : current.calls <= CALLS_BEFORE_ENDING_RUN ? "refuse" : "end";
-	};
-}
-
-const countCall = callCounter();
-
-function failure(text: string): ToolExecutionResult {
-	return { output: [{ type: "text", text }], isError: true };
-}
-
 export const WAIT_NOTE =
 	"You don't run `louro wait`: louro waits for you, and new IRC events arrive as messages. Reply with `louro send`.";
 
@@ -41,11 +21,8 @@ export const louroTool = defineTool({
 		}),
 	}),
 	async execute({ command }, api, context) {
-		// A run's first input names it; ending a run lets the queued chat start the next one.
-		const live = await api.snapshot(LiveDoc, api.conversationId, context);
-		const verdict = countCall(String(live?.run?.inputs[0]));
-		if (verdict === "refuse") return failure(TOO_MANY_CALLS);
-		if (verdict === "end") return { ...failure(TOO_MANY_CALLS), control: { terminate: true } };
+		const capped = await capCalls(api, context);
+		if (capped) return capped;
 		let args: string[];
 		try {
 			args = parseCommand(command);

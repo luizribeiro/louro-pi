@@ -2,16 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type ConversationId, LiveDoc, type SubmissionId, type TaskId } from "@earendil-works/pi-durable";
-import {
-	CALLS_BEFORE_ENDING_RUN,
-	callCounter,
-	louroExtension,
-	louroTool,
-	MAX_CALLS_PER_RUN,
-	ROOM_NOTE,
-	TOO_MANY_CALLS,
-	WAIT_NOTE,
-} from "./tool.ts";
+import { CALLS_BEFORE_ENDING_RUN, MAX_CALLS_PER_RUN, TOO_MANY_CALLS } from "./calls.ts";
+import { louroExtension, louroTool, ROOM_NOTE, WAIT_NOTE } from "./tool.ts";
 
 const SYSTEM = "You are louro, a bot on IRC.\n";
 const PRIMER = "louro connects you to IRC as a bot.\n\nRun `louro <command> --help` for a command's flags.\n";
@@ -52,16 +44,6 @@ test("rejects a disallowed command without running louro", async () => {
 	for (const command of ["louro wait --timeout 60", "louro quit", "louro status; ls"]) {
 		assert.match(await refusal(command, api), /not allowed/, command);
 	}
-});
-
-test("allows 8 calls per run, refuses 4 more, then ends the run", () => {
-	assert.equal(MAX_CALLS_PER_RUN, 8);
-	assert.equal(CALLS_BEFORE_ENDING_RUN, 12);
-	const count = callCounter();
-	const verdicts = Array.from({ length: 14 }, () => count("run-1"));
-	assert.deepEqual(verdicts, [...Array(8).fill("run"), ...Array(4).fill("refuse"), "end", "end"]);
-	assert.equal(count("run-2"), "run");
-	assert.equal(count("run-2"), "run");
 });
 
 test("refuses louro calls past the cap and asks to end a run that keeps calling", async () => {
