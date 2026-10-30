@@ -18,14 +18,11 @@ const PRIMER = "louro connects you to IRC as a bot.\n\nRun `louro <command> --he
 
 let runs = 0;
 
-const BOTS = 1 as ConversationId;
-const LUIZ = 2 as ConversationId;
-
 /** The tool's api inside a new run of a conversation, as pi-durable's documents show it. */
-function inNewRun(conversationId = BOTS) {
+function inNewRun() {
 	const live = { run: { taskId: 30 as TaskId, inputs: [++runs as SubmissionId] } };
 	const snapshot = async (token: unknown) => (token === LiveDoc ? live : undefined);
-	return { conversationId, snapshot } as unknown as Parameters<typeof louroTool.execute>[1];
+	return { conversationId: 1 as ConversationId, snapshot } as unknown as Parameters<typeof louroTool.execute>[1];
 }
 
 async function refusal(command: string, api: ReturnType<typeof inNewRun>) {
@@ -61,20 +58,10 @@ test("allows 8 calls per run, refuses 4 more, then ends the run", () => {
 	assert.equal(MAX_CALLS_PER_RUN, 8);
 	assert.equal(CALLS_BEFORE_ENDING_RUN, 12);
 	const count = callCounter();
-	const verdicts = Array.from({ length: 14 }, () => count(BOTS, "run-1"));
+	const verdicts = Array.from({ length: 14 }, () => count("run-1"));
 	assert.deepEqual(verdicts, [...Array(8).fill("run"), ...Array(4).fill("refuse"), "end", "end"]);
-	assert.equal(count(BOTS, "run-2"), "run");
-	assert.equal(count(BOTS, "run-2"), "run");
-});
-
-test("counts each conversation's runs on their own, even when they interleave", () => {
-	const count = callCounter();
-	for (let i = 0; i < MAX_CALLS_PER_RUN; i++) {
-		assert.equal(count(BOTS, "run-1"), "run");
-		assert.equal(count(LUIZ, "run-2"), "run");
-	}
-	assert.equal(count(BOTS, "run-1"), "refuse");
-	assert.equal(count(LUIZ, "run-2"), "refuse");
+	assert.equal(count("run-2"), "run");
+	assert.equal(count("run-2"), "run");
 });
 
 test("refuses louro calls past the cap and asks to end a run that keeps calling", async () => {

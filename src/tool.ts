@@ -10,14 +10,12 @@ export const TOO_MANY_CALLS = "too many louro calls this turn; reply in text wit
 
 export type CallVerdict = "run" | "refuse" | "end";
 
-/** Counts each conversation's calls per run; past the cap they are refused, and a model that keeps calling gets its run ended. */
-export function callCounter(): (conversation: number, run: string) => CallVerdict {
-	const current = new Map<number, { run: string; calls: number }>();
-	return (conversation, run) => {
-		const last = current.get(conversation);
-		const calls = last?.run === run ? last.calls + 1 : 1;
-		current.set(conversation, { run, calls });
-		return calls <= MAX_CALLS_PER_RUN ? "run" : calls <= CALLS_BEFORE_ENDING_RUN ? "refuse" : "end";
+/** Counts a run's calls; past the cap they are refused, and a model that keeps calling gets its run ended. */
+export function callCounter(): (run: string) => CallVerdict {
+	let current = { run: "", calls: 0 };
+	return (run) => {
+		current = { run, calls: current.run === run ? current.calls + 1 : 1 };
+		return current.calls <= MAX_CALLS_PER_RUN ? "run" : current.calls <= CALLS_BEFORE_ENDING_RUN ? "refuse" : "end";
 	};
 }
 
@@ -45,7 +43,7 @@ export const louroTool = defineTool({
 	async execute({ command }, api, context) {
 		// A run's first input names it; ending a run lets the queued chat start the next one.
 		const live = await api.snapshot(LiveDoc, api.conversationId, context);
-		const verdict = countCall(api.conversationId, String(live?.run?.inputs[0]));
+		const verdict = countCall(String(live?.run?.inputs[0]));
 		if (verdict === "refuse") return failure(TOO_MANY_CALLS);
 		if (verdict === "end") return { ...failure(TOO_MANY_CALLS), control: { terminate: true } };
 		let args: string[];
