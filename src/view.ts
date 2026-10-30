@@ -33,18 +33,38 @@ export function formatBatch(count: number, from: readonly string[]): string {
 	return from.length === 0 ? events : `${events} from ${oneLine(from.join(", "))}`;
 }
 
-function formatMemoryEdit({ remember, forget }: { remember?: unknown; forget?: unknown }): string[] {
-	const list = (value: unknown) => (Array.isArray(value) ? value : []);
+type Args = Record<string, unknown>;
+
+const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+/** `- name #id` for each id dropped, then `+ name…` for each item added. */
+function edits(name: string, dropped: unknown, added: unknown, describe: (item: unknown) => string): string[] {
 	return [
-		...list(forget).map((id) => `- memory #${oneLine(String(id))}`),
-		...list(remember).map((text) => `+ memory: ${oneLine(String(text))}`),
+		...list(dropped).map((id) => `- ${name} #${oneLine(String(id))}`),
+		...list(added).map((item) => oneLine(`+ ${name}${describe(item)}`)),
 	];
 }
+
+function whenOf({ in: after, at, every }: Args): string {
+	const when = [after && `in ${after}`, at && `at ${at}`, every && `every ${every}`].filter(Boolean);
+	return when.length > 0 ? ` ${when.join(" ")}` : "";
+}
+
+const louroLines = ({ command }: Args) => [`$ ${oneLine(String(command))}`];
+
+const TOOL_LINES: Record<string, (args: Args) => string[]> = {
+	memory: ({ remember, forget }) => edits("memory", forget, remember, (text) => `: ${text}`),
+	timer: ({ set, cancel }) =>
+		edits("timer", cancel, set, (item) => {
+			const setting = (item ?? {}) as Args;
+			return `${whenOf(setting)}: ${setting.note ?? ""}`;
+		}),
+};
 
 export function formatEvent(event: AgentEvent): string[] {
 	switch (event.type) {
 		case "tool_execution_start":
-			return event.toolName === "memory" ? formatMemoryEdit(event.args) : [`$ ${oneLine(String(event.args.command))}`];
+			return (TOOL_LINES[event.toolName] ?? louroLines)(event.args);
 		case "tool_execution_end":
 			return event.entry ? [`  ${textOf(messageOf(event.entry, "toolResult"))}`] : [];
 		case "message_end": {

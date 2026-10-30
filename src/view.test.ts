@@ -66,6 +66,35 @@ test("shows each note the model remembers or forgets", () => {
 	assert.deepEqual(formatEvent({ type: "tool_execution_start", ...call, toolName: "memory", args: {} }), []);
 });
 
+test("shows each timer the model sets or cancels", () => {
+	const edit = {
+		cancel: [2],
+		set: [
+			{ note: "post the #lounge digest to luiz", at: "2026-10-31T09:00:00-03:00", every: "1d" },
+			{ note: "check maria's\nbuild", in: "45m" },
+		],
+	};
+	assert.deepEqual(formatEvent({ type: "tool_execution_start", ...call, toolName: "timer", args: edit }), [
+		"- timer #2",
+		"+ timer at 2026-10-31T09:00:00-03:00 every 1d: post the #lounge digest to luiz",
+		"+ timer in 45m: check maria's build",
+	]);
+	assert.deepEqual(
+		formatEvent({ type: "tool_execution_start", ...call, toolName: "timer", args: { set: [{}, null], cancel: "3" } }),
+		["+ timer:", "+ timer:"],
+	);
+});
+
+test("shows any other tool's call like a louro command", () => {
+	assert.deepEqual(
+		formatEvent({ type: "tool_execution_start", ...call, toolName: "louro", args: { command: "louro status" } }),
+		["$ louro status"],
+	);
+	assert.deepEqual(formatEvent({ type: "tool_execution_start", ...call, toolName: "mystery", args: {} }), [
+		"$ undefined",
+	]);
+});
+
 test("shows the model's final text but not its thinking or tool calls", () => {
 	assert.deepEqual(
 		formatEvent(
