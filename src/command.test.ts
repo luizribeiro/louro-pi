@@ -52,7 +52,11 @@ test("allows only the agent's subcommands", () => {
 	assert.deepEqual(parseCommand("louro --help"), ["--help"]);
 	assert.deepEqual(parseCommand("louro send --help"), ["send", "--help"]);
 	assert.deepEqual(parseCommand("louro history '#bots'"), ["history", "#bots"]);
+	assert.deepEqual(parseCommand("louro whois maria"), ["whois", "maria"]);
+	assert.deepEqual(parseCommand("louro whowas joao"), ["whowas", "joao"]);
 	for (const line of [
+		"louro join '#lounge'",
+		"louro nick parrot",
 		"louro connect --config /Users/luiz/.ssh/known_hosts",
 		"louro quit",
 		"louro wait --timeout 60",

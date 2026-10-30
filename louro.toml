@@ -14,5 +14,6 @@ irc.typing = ["#bots", "account:luiz"]
 irc.react = ["#bots", "account:luiz"]
 irc.dm.read = ["account:luiz"]
 irc.dm.send = ["account:luiz"]
+irc.whois = true
 # For the operator; the louro-pi tool never lets the agent run quit.
 irc.quit = true
