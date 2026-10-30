@@ -8,6 +8,7 @@ import {
 	louroExtension,
 	louroTool,
 	MAX_CALLS_PER_RUN,
+	ROOM_NOTE,
 	TOO_MANY_CALLS,
 	WAIT_NOTE,
 } from "./tool.ts";
@@ -45,7 +46,7 @@ test("the extension has only the louro tool and one untagged prompt", async () =
 	const input = { conversationId: 1 as ConversationId } as Parameters<NonNullable<typeof prompt>["render"]>[0];
 	assert.equal(
 		await prompt?.render(input, BACKGROUND_CONTEXT),
-		`You are louro, a bot on IRC.\n\nlouro connects you to IRC as a bot.\n\nRun \`louro <command> --help\` for a command's flags.\n\n${WAIT_NOTE}`,
+		`You are louro, a bot on IRC.\n\nlouro connects you to IRC as a bot.\n\nRun \`louro <command> --help\` for a command's flags.\n\n${WAIT_NOTE}\n\n${ROOM_NOTE}`,
 	);
 });
 

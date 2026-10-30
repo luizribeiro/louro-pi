@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AgentEvent, SubmissionId } from "@earendil-works/pi-durable";
-import { replyTracker, sendTarget } from "./reply.ts";
+import { casefold, replyTracker, sendTarget } from "./reply.ts";
 
 const MENTION = 41 as SubmissionId;
 const CHATTER = 42 as SubmissionId;
@@ -236,4 +236,10 @@ test("finds a send's target past its flags and quotes, casefolded", () => {
 		[undefined, undefined],
 	];
 	for (const [command, target] of cases) assert.equal(sendTarget(command), target, String(command));
+});
+
+test("casefolds ASCII letters only", () => {
+	assert.equal(casefold("#Bots[1]\\~"), "#bots[1]\\~");
+	assert.equal(casefold("Luiz"), "luiz");
+	assert.equal(casefold("#AÇÃO"), "#aÇÃo");
 });

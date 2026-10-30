@@ -1,6 +1,5 @@
 import type { Message } from "@earendil-works/pi-ai";
 import type { AgentEvent, EntryRecord } from "@earendil-works/pi-durable";
-import { type Scope, targetOf } from "./target.ts";
 
 const MAX_LINE = 300;
 
@@ -23,18 +22,15 @@ function textOf(message: Of<"assistant" | "toolResult"> | undefined): string {
 	return oneLine((message?.content ?? []).map((block) => (block.type === "text" ? block.text : "")).join(" "));
 }
 
-/** A conversation's line, prefixed with its channel or DM partner. */
-export function labeled(scope: Scope, line: string): string {
-	return `[${oneLine(targetOf(scope))}] ${line}`;
-}
-
-/** An event no conversation gets, like louro's connection reports. */
-export function formatUnrouted(event: object): string {
+/** One of louro's connection reports, which only the live view gets. */
+export function formatReport(event: object): string {
 	return `~ ${oneLine(JSON.stringify(event))}`;
 }
 
-export function formatBatch(count: number): string {
-	return `< ${count} event${count === 1 ? "" : "s"}`;
+/** A batch the bot reads, and the channels and DM partners it came from. */
+export function formatBatch(count: number, from: readonly string[]): string {
+	const events = `< ${count} event${count === 1 ? "" : "s"}`;
+	return from.length === 0 ? events : `${events} from ${oneLine(from.join(", "))}`;
 }
 
 export function formatEvent(event: AgentEvent): string[] {

@@ -1,8 +1,12 @@
 import type { AgentEvent, SubmissionId } from "@earendil-works/pi-durable";
 import { parseCommand } from "./command.ts";
-import { casefold } from "./target.ts";
 
 type Block = { type: string; arguments?: { command?: unknown } };
+
+/** ASCII casemapping, as louro and Ergo use; folding more, like rfc1459's `[]\~`, would let `{luiz}` pass for `[luiz]`. */
+export function casefold(name: string): string {
+	return name.replace(/[A-Z]/g, (char) => char.toLowerCase());
+}
 
 const commandOf = (block: Block) => (block.type === "toolCall" ? String(block.arguments?.command ?? "") : "");
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { AgentEvent, ConversationId, EntryId, TaskId } from "@earendil-works/pi-durable";
-import { formatBatch, formatEvent, formatUnrouted, labeled, oneLine } from "./view.ts";
+import { formatBatch, formatEvent, formatReport, oneLine } from "./view.ts";
 
 const call = { toolCallId: "call_1", toolName: "louro", taskId: 7 as TaskId };
 const usage = {
@@ -102,9 +102,10 @@ test("ignores the events the view doesn't show", () => {
 	assert.deepEqual(formatEvent({ type: "message_update", usage, changes: [] }), []);
 });
 
-test("counts a submitted batch", () => {
-	assert.equal(formatBatch(1), "< 1 event");
-	assert.equal(formatBatch(3), "< 3 events");
+test("counts a submitted batch and where it came from, stripping control characters from nicks", () => {
+	assert.equal(formatBatch(1, ["#bots"]), "< 1 event from #bots");
+	assert.equal(formatBatch(3, ["#lounge", "luiz\x1b]0;pwned\x07"]), "< 3 events from #lounge, luiz]0;pwned");
+	assert.equal(formatBatch(1, []), "< 1 event");
 });
 
 test("cuts long lines at 300 characters", () => {
@@ -122,15 +123,10 @@ test("strips terminal control sequences from untrusted text", () => {
 	);
 });
 
-test("labels each line with its channel or DM partner, stripping control characters from the nick", () => {
-	assert.equal(labeled({ kind: "channel", name: "#bots" }, "< 1 event"), "[#bots] < 1 event");
-	assert.equal(labeled({ kind: "dm", partner: "luiz\x1b]0;pwned\x07" }, "> hi"), "[luiz]0;pwned] > hi");
-});
-
-test("shows an event no conversation gets on one line", () => {
+test("shows louro's connection reports on one line", () => {
 	const event = { id: 7, type: "connection", time: "2026-10-17T21:05:00.000Z", state: "disconnected", retry_in: 5 };
 	assert.equal(
-		formatUnrouted(event),
+		formatReport(event),
 		'~ {"id":7,"type":"connection","time":"2026-10-17T21:05:00.000Z","state":"disconnected","retry_in":5}',
 	);
 });

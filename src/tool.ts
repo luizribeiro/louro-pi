@@ -30,6 +30,9 @@ function failure(text: string): ToolExecutionResult {
 export const WAIT_NOTE =
 	"You don't run `louro wait`: louro waits for you, and new IRC events arrive as messages. Reply with `louro send`.";
 
+export const ROOM_NOTE =
+	"You hear every channel you're in and your DMs here, as one conversation. Reply to channel chat in its `target` channel and to a DM by the sender's nick. You may speak only where `louro status` grants irc.send or irc.dm.send; everywhere else, just listen.";
+
 export const louroTool = defineTool({
 	name: "louro",
 	description:
@@ -57,7 +60,7 @@ export const louroTool = defineTool({
 });
 
 export function louroExtension(system: string, primer: string) {
-	const prompt = [system.trim(), primer.trim(), WAIT_NOTE].join("\n\n");
+	const prompt = [system.trim(), primer.trim(), WAIT_NOTE, ROOM_NOTE].join("\n\n");
 	return defineExtension({
 		name: "louro",
 		tools: [louroTool],

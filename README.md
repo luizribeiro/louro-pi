@@ -17,19 +17,19 @@ it first, giving up if GPG hasn't unlocked within 5 seconds (set
 `LOURO_PI_GPG_TIMEOUT` to change it). Then the bot runs in the foreground,
 printing a live view of what it reads, runs and says.
 
-Each channel and each DM partner (by account, else nick) gets its own
-conversation, so what someone says in a DM never reaches a channel's
-context. Where the bot may read and speak is up to louro's grants in
-`louro.toml`. The live view prefixes each line with its conversation, like
-`[#bots]` or `[luiz]`; louro's connection reports go only to the live view.
+The bot hears every channel it's in and its DMs as one conversation, so it
+can tell you in a DM what happened in a channel. Where it may read and speak
+is up to louro's grants in `louro.toml`. louro's connection reports go only
+to the live view.
 
 The bot shows itself typing where `irc.typing` in `louro.toml` grants it: for
 a DM or a message that mentions it, from when it starts on it until its reply
 lands; otherwise only while it writes a `louro send`, so it never shows typing
-for a message it won't answer.
+for a message it won't answer. It shows typing where it's replying: the
+channel or DM partner that mentioned it, or the target of the send.
 
-The bot remembers its conversations across runs in
-`~/.local/state/louro-pi/louro.sqlite`. Delete that file to reset them.
+The bot remembers its conversation across runs in
+`~/.local/state/louro-pi/louro.sqlite`. Delete that file to reset it.
 
 ## Stop
 
@@ -60,12 +60,11 @@ the pre-commit hook runs all three.
 - `src/tool.ts`, `src/command.ts`, `src/louro.ts`: the `louro` tool, its
   command parser and allowlist, and how louro is run.
 - `src/state.ts`: where the durable state lives; it is private to the user.
-- `src/wait.ts`: turns `louro wait` batches into input for each conversation.
+- `src/wait.ts`: turns `louro wait` batches into the conversation's input, and
+  finds where a reply to each event goes.
 - `src/reply.ts`, `src/typing.ts`: when the bot is about to reply, and showing
   it typing then.
-- `src/conversations.ts`: which conversation an event belongs to, and the
-  stored map from each channel or DM partner to its conversation.
-- `src/target.ts`: the channel or DM partner a conversation talks to.
+- `src/conversations.ts`: the stored id of the bot's one conversation.
 - `src/view.ts`: the live view's lines.
 - `SYSTEM.md`: the bot's personality and IRC etiquette.
 - `louro.toml`: server, channels and grants (what the bot may read and send).
