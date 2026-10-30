@@ -8,7 +8,6 @@ import {
 	louroExtension,
 	louroTool,
 	MAX_CALLS_PER_RUN,
-	SCOPE_NOTE,
 	TOO_MANY_CALLS,
 	WAIT_NOTE,
 } from "./tool.ts";
@@ -20,19 +19,11 @@ let runs = 0;
 
 const BOTS = 1 as ConversationId;
 const LUIZ = 2 as ConversationId;
-const ROOT = 3 as ConversationId;
-
-const conversations = {
-	byKey: {
-		"#bots": { id: BOTS, scope: { kind: "channel", name: "#bots" } },
-		"account:luiz": { id: LUIZ, scope: { kind: "dm", partner: "luiz" } },
-	},
-};
 
 /** The tool's api inside a new run of a conversation, as pi-durable's documents show it. */
 function inNewRun(conversationId = BOTS) {
 	const live = { run: { taskId: 30 as TaskId, inputs: [++runs as SubmissionId] } };
-	const snapshot = async (token: unknown) => (token === LiveDoc ? live : conversations);
+	const snapshot = async (token: unknown) => (token === LiveDoc ? live : undefined);
 	return { conversationId, snapshot } as unknown as Parameters<typeof louroTool.execute>[1];
 }
 
@@ -54,7 +45,7 @@ test("the extension has only the louro tool and one untagged prompt", async () =
 	const input = { conversationId: 1 as ConversationId } as Parameters<NonNullable<typeof prompt>["render"]>[0];
 	assert.equal(
 		await prompt?.render(input, BACKGROUND_CONTEXT),
-		`You are louro, a bot on IRC.\n\nlouro connects you to IRC as a bot.\n\nRun \`louro <command> --help\` for a command's flags.\n\n${WAIT_NOTE}\n\n${SCOPE_NOTE}`,
+		`You are louro, a bot on IRC.\n\nlouro connects you to IRC as a bot.\n\nRun \`louro <command> --help\` for a command's flags.\n\n${WAIT_NOTE}`,
 	);
 });
 
@@ -63,13 +54,6 @@ test("rejects a disallowed command without running louro", async () => {
 	for (const command of ["louro wait --timeout 60", "louro quit", "louro status; ls"]) {
 		assert.match(await refusal(command, api), /not allowed/, command);
 	}
-});
-
-test("refuses a command aimed past its conversation's target without running louro", async () => {
-	assert.match(await refusal("louro send luiz 'the secret word?'", inNewRun(BOTS)), /this conversation is #bots/);
-	assert.match(await refusal("louro history luiz", inNewRun(BOTS)), /this conversation is #bots/);
-	assert.match(await refusal("louro send '#bots' 'papaya'", inNewRun(LUIZ)), /your DMs with luiz/);
-	assert.match(await refusal("louro status", inNewRun(ROOT)), /no IRC channel or DM partner/);
 });
 
 test("allows 8 calls per run, refuses 4 more, then ends the run", () => {

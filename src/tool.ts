@@ -1,9 +1,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, LiveDoc, section, type ToolExecutionResult } from "@earendil-works/pi-durable";
 import { formatResult, parseCommand } from "./command.ts";
-import { Conversations, scopeOf } from "./conversations.ts";
 import { runLouro } from "./louro.ts";
-import { checkTarget } from "./target.ts";
 
 const TIMEOUT_MS = 60_000;
 export const MAX_CALLS_PER_RUN = 8;
@@ -32,9 +30,6 @@ function failure(text: string): ToolExecutionResult {
 export const WAIT_NOTE =
 	"You don't run `louro wait`: louro waits for you, and new IRC events arrive as messages. Reply with `louro send`.";
 
-export const SCOPE_NOTE =
-	"Each conversation is one IRC channel or one person's DMs, and the louro tool refuses commands aimed anywhere else.";
-
 export const louroTool = defineTool({
 	name: "louro",
 	description:
@@ -56,16 +51,13 @@ export const louroTool = defineTool({
 		} catch (error) {
 			return failure((error as Error).message);
 		}
-		const scope = scopeOf(await api.snapshot(Conversations, context), api.conversationId);
-		const refusal = scope ? checkTarget(scope, args) : "this conversation has no IRC channel or DM partner";
-		if (refusal) return failure(refusal);
 		const { error, stdout, stderr } = await runLouro(args, TIMEOUT_MS, context.abortSignal);
 		return { output: [{ type: "text", text: formatResult(error, stdout, stderr) }], isError: error !== null };
 	},
 });
 
 export function louroExtension(system: string, primer: string) {
-	const prompt = [system.trim(), primer.trim(), WAIT_NOTE, SCOPE_NOTE].join("\n\n");
+	const prompt = [system.trim(), primer.trim(), WAIT_NOTE].join("\n\n");
 	return defineExtension({
 		name: "louro",
 		tools: [louroTool],

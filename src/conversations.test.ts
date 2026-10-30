@@ -7,7 +7,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels } from "@earendil-works/pi-ai";
 import { createRegistry, Harness } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
-import { Conversations, conversationFor, routeOf, scopeOf } from "./conversations.ts";
+import { conversationFor, routeOf } from "./conversations.ts";
 
 const luiz = { nick: "luiz", account: "luiz", away: false, bot: false };
 const chat = { type: "message", time: "2026-10-17T21:04:11.392Z", msgid: "4y8kq7j2c9mnz", origin: "live" };
@@ -49,7 +49,7 @@ async function openHarness(path: string) {
 	return Harness.open(storage, { models: createModels(), registry: createRegistry() }, BACKGROUND_CONTEXT);
 }
 
-test("keeps one conversation per target across restarts, and finds each one's scope", async () => {
+test("keeps one conversation per target across restarts", async () => {
 	const path = join(await mkdtemp(join(tmpdir(), "louro-pi-conversations-")), "louro.sqlite");
 	const bots = { key: "#bots", scope: { kind: "channel", name: "#bots" } } as const;
 	const luizDm = (partner: string) => ({ key: "account:luiz", scope: { kind: "dm", partner } }) as const;
@@ -65,10 +65,6 @@ test("keeps one conversation per target across restarts, and finds each one's sc
 
 	harness = await openHarness(path);
 	assert.equal(await claim(luizDm("luiz_")), luizId);
-	const conversations = await harness.snapshot(Conversations, BACKGROUND_CONTEXT);
-	assert.deepEqual(scopeOf(conversations, botsId), { kind: "channel", name: "#bots" });
-	assert.deepEqual(scopeOf(conversations, luizId), { kind: "dm", partner: "luiz_" });
-	assert.equal(scopeOf(conversations, (luizId + 100) as typeof luizId), undefined);
-	assert.equal(scopeOf(undefined, botsId), undefined);
+	assert.equal(await claim(bots), botsId);
 	await harness.close(BACKGROUND_CONTEXT);
 });

@@ -42,7 +42,3 @@ export async function conversationFor(tx: Tx, { key, scope }: Route): Promise<Co
 	byKey[key] = { id, scope };
 	return id;
 }
-
-export function scopeOf(conversations: Readonly<Known> | undefined, id: ConversationId): Scope | undefined {
-	return Object.values(conversations?.byKey ?? {}).find((conversation) => conversation.id === id)?.scope;
-}

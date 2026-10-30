@@ -19,9 +19,8 @@ printing a live view of what it reads, runs and says.
 
 Each channel and each DM partner (by account, else nick) gets its own
 conversation, so what someone says in a DM never reaches a channel's
-context. The tool enforces it: a channel's conversation may only target that
-channel, and a DM's may only send to that person, though it may read channel
-history. The live view prefixes each line with its conversation, like
+context. Where the bot may read and speak is up to louro's grants in
+`louro.toml`. The live view prefixes each line with its conversation, like
 `[#bots]` or `[luiz]`; louro's connection reports go only to the live view.
 
 The bot shows itself typing where `irc.typing` in `louro.toml` grants it: for
@@ -66,7 +65,7 @@ the pre-commit hook runs all three.
   it typing then.
 - `src/conversations.ts`: which conversation an event belongs to, and the
   stored map from each channel or DM partner to its conversation.
-- `src/target.ts`: the check that a command stays within its conversation.
+- `src/target.ts`: the channel or DM partner a conversation talks to.
 - `src/view.ts`: the live view's lines.
 - `SYSTEM.md`: the bot's personality and IRC etiquette.
 - `louro.toml`: server, channels and grants (what the bot may read and send).
