@@ -43,6 +43,14 @@ while louro-pi was stopped fires once on the next start. The live view shows
 each timer it sets (`+ timer in 45m: …`) or cancels (`- timer #2`), and each
 one that fires (`< timer #2`).
 
+Long prompts make the bot slow to answer, so its chat is summarized well
+before the model's window fills: in the background from about 64k tokens, and
+before its next reply at 80k, keeping the last 8k or so word for word. After
+an hour without chat it is summarized once more, so the next reply starts from
+a short prompt. The live view shows each summary starting
+(`~ compacting (threshold)`, or `(manual)` after a quiet hour) and any that
+fails.
+
 ## Stop
 
 Ctrl-C or `pkill -f louro-pi-app/src/main.ts` stops the bot. The louro daemon
@@ -74,6 +82,8 @@ the pre-commit hook runs all three.
 - `src/memory.ts`: the `memory` tool and the long-term notes it keeps.
 - `src/timers.ts`, `src/wake.ts`: the `timer` tool and its timers, and the
   loop that wakes the bot when one is due.
+- `src/idle.ts`: the loop that summarizes the chat after a quiet hour.
+- `src/tick.ts`: the retry-every-tick loop that the timer and idle loops share.
 - `src/calls.ts`: the cap on tool calls per reply, shared by every tool.
 - `src/state.ts`: where the durable state lives; it is private to the user.
 - `src/wait.ts`: turns `louro wait` batches into the conversation's input, and

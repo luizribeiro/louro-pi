@@ -7,6 +7,7 @@ import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite
 import { formatResult } from "./command.ts";
 import { agentChange, harnessSettings, litellmModels } from "./config.ts";
 import { botConversation } from "./conversations.ts";
+import { IDLE_INSTRUCTIONS, idleCompaction } from "./idle.ts";
 import { runLouro } from "./louro.ts";
 import { privateStatePath } from "./state.ts";
 import { advanceTimers, Timers } from "./timers.ts";
@@ -68,12 +69,20 @@ harness.resume();
 
 const pause = (ms: number, signal: AbortSignal) => sleep(ms, undefined, { signal }).catch(() => {});
 
+const idle = idleCompaction({
+	compact: () => conversation.compact(IDLE_INSTRUCTIONS, BACKGROUND_CONTEXT),
+	now: Date.now,
+	sleep: pause,
+	warn: console.error,
+});
+
 const forwarding = forwardEvents(
 	{
 		wait: (signal) => runLouro(WAIT_ARGS, WAIT_TIMEOUT_MS, signal),
 		newId: randomUUID,
 		// Admission is owed once louro handed the batch over, so shutdown must not abort it.
 		submit: async ({ input, replyTargets }) => {
+			idle.touch();
 			const submission = await conversation.submit(input, BACKGROUND_CONTEXT);
 			if (replyTargets.length > 0) typing.expect(submission.id, replyTargets);
 		},
@@ -96,5 +105,5 @@ const waking = wakeForTimers(
 	},
 	shutdown.signal,
 );
-await Promise.all([forwarding, waking]);
+await Promise.all([forwarding, waking, idle.run(shutdown.signal)]);
 await harness.close(BACKGROUND_CONTEXT);
