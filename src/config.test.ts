@@ -16,11 +16,12 @@ test("the agent runs Qwen with only the louro extension and its tools", () => {
 	});
 });
 
-test("settings queue every batch and back off a long time, in the model's 256k window", () => {
+test("settings queue every batch, back off a long time, and compact past 80k of the 256k window", () => {
 	assert.equal(CONTEXT_WINDOW, 262144);
 	assert.deepEqual(harnessSettings(extension), {
 		extensions: [extension],
 		followUpMode: "all",
 		retry: { maxRetries: 10, maxAgentDelayMs: 300_000 },
+		compaction: { reserveTokens: CONTEXT_WINDOW - 80_000, backgroundTokens: 16_384, keepRecentTokens: 8_000 },
 	});
 });

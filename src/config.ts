@@ -3,6 +3,8 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import type { AgentChange, Extension, HarnessSettings } from "@earendil-works/pi-durable";
 
 export const CONTEXT_WINDOW = 262144;
+// Prompts past this get slow to read cold, so compaction kicks in long before the window fills.
+const CONTEXT_BUDGET = 80_000;
 
 const PROVIDER = "litellm";
 
@@ -51,6 +53,12 @@ export function harnessSettings(extension: Extension): HarnessSettings {
 		followUpMode: "all",
 		// Long enough to ride out the model server restarting instead of dropping the batch.
 		retry: { maxRetries: 10, maxAgentDelayMs: 5 * 60_000 },
+		compaction: {
+			// pi-durable blocks to compact at contextWindow - reserveTokens, so this is how the budget is set.
+			reserveTokens: CONTEXT_WINDOW - CONTEXT_BUDGET,
+			backgroundTokens: 16_384,
+			keepRecentTokens: 8_000,
+		},
 	};
 }
 
