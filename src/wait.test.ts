@@ -118,6 +118,29 @@ test("a batch of only connection reports submits nothing", () => {
 	assert.deepEqual(step, { kind: "submit", delivery: undefined, reports: [connection] });
 });
 
+test("submits a watched nick's presence change without expecting a reply anywhere", () => {
+	const online = {
+		id: 47,
+		type: "presence",
+		time: "2026-10-17T21:06:00.000Z",
+		nick: "maria",
+		state: "online",
+		away: null,
+		untrusted: true,
+	};
+	const step = nextStep(waited({ cursor: 47, timed_out: false, more: false, notice: NOTICE, events: [online] }), newId);
+	assert.deepEqual(step, {
+		kind: "submit",
+		delivery: {
+			count: 1,
+			from: [],
+			replyTargets: [],
+			input: followUp([online], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90"),
+		},
+		reports: [],
+	});
+});
+
 test("replies to a channel in it, and to a DM or invite by its sender", () => {
 	const invite = { type: "invite", from: MESSAGE.from, channel: "#lounge", untrusted: true };
 	assert.equal(replyTargetOf(MESSAGE), "#bots");
