@@ -29,6 +29,7 @@
           nodejs
           pkgs.bash
           pkgs.coreutils
+          pkgs.gitleaks
           pkgs.gnupg
           pkgs.sops
         ];
@@ -65,6 +66,7 @@
             src = ./.;
             nativeBuildInputs = [
               nodejs
+              pkgs.gitleaks
               pkgs.importNpmLock.linkNodeModulesHook
             ];
             npmDeps = nodeModules;
@@ -76,7 +78,10 @@
           entry = "${
             pkgs.writeShellApplication {
               name = "${script}-hook";
-              runtimeInputs = [ nodejs ];
+              runtimeInputs = [
+                nodejs
+                pkgs.gitleaks
+              ];
               text = "npm run ${script}";
             }
           }/bin/${script}-hook";
