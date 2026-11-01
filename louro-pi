@@ -4,6 +4,10 @@ set -euo pipefail
 src="${LOURO_PI_SRC:-$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)}"
 
 : "${LITELLM_API_KEY:?LITELLM_API_KEY must be set}"
+if grep -q @filter@ "$src/louro.toml"; then
+  echo "louro-pi: louro.toml has no outgoing filter yet; run the built app with \`nix run .#\`" >&2
+  exit 1
+fi
 LOURO_BIN="$(command -v "${LOURO_BIN:-louro}")"
 export LOURO_BIN
 

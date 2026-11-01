@@ -51,6 +51,15 @@ a short prompt. The live view shows each summary starting
 (`~ compacting (threshold)`, or `(manual)` after a quiet hour) and any that
 fails.
 
+Everything the bot would show others goes through `src/filter.ts` first,
+as louro's outgoing filter. It blocks anything that looks like a secret: what
+[gitleaks](https://github.com/gitleaks/gitleaks) recognizes, private keys,
+passwords assigned to a name and long random-looking strings, which also
+catches links with long ids, like a Google Doc's. It swaps emails, phone
+numbers, card numbers, CPFs, CNPJs, SSNs and IBANs for `[email]` and the like,
+except in DMs to the accounts listed after the filter's path in `louro.toml`. The bot is told
+what was blocked or swapped. If the filter fails, nothing is sent.
+
 ## Stop
 
 Ctrl-C or `pkill -f louro-pi-app/src/main.ts` stops the bot. The louro daemon
@@ -68,7 +77,8 @@ Then stop the louro daemon so the next run connects with it.
 
 ## Check
 
-`nix flake check` runs the type check, tests and Biome. In the dev shell,
+`nix flake check` runs the type check, tests and Biome, and tries the filter
+the built `louro.toml` points at. In the dev shell,
 `npm run typecheck`, `npm test` and `npm run lint` run them one at a time, and
 the pre-commit hook runs all three.
 
@@ -90,9 +100,12 @@ the pre-commit hook runs all three.
   finds where a reply to each event goes.
 - `src/reply.ts`, `src/typing.ts`: when the bot is about to reply, and showing
   it typing then.
+- `src/filter.ts`: louro's outgoing filter, built from `src/secrets.ts`,
+  `src/gitleaks.ts` and `src/pii.ts`, which spot secrets and personal details.
 - `src/conversations.ts`: the stored id of the bot's one conversation.
 - `src/view.ts`: the live view's lines.
 - `SYSTEM.md`: the bot's personality and IRC etiquette.
-- `louro.toml`: server, channels and grants (what the bot may read and send).
+- `louro.toml`: server, channels, grants (what the bot may read and send) and
+  the outgoing filter.
 - `louro-pi`: the launcher.
 - `secrets/louro.yaml`: the bot's SASL password, encrypted with sops.

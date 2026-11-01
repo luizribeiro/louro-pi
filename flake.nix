@@ -24,12 +24,15 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         nodejs = pkgs.nodejs_24;
-        runtimeInputs = [
-          louro.packages.${system}.default
+        filterInputs = [
           nodejs
+          pkgs.gitleaks
+        ];
+        runtimeInputs = filterInputs ++ [
+          louro.packages.${system}.default
           pkgs.bash
           pkgs.coreutils
-          pkgs.gitleaks
+          pkgs.gnugrep
           pkgs.gnupg
           pkgs.sops
         ];
@@ -49,9 +52,20 @@
             ./louro-pi
           ];
         };
+        filterArgs = pkgs.lib.escapeShellArgs (
+          builtins.tail (builtins.fromTOML (builtins.readFile ./louro.toml)).filter.outgoing
+        );
+        filter = pkgs.writeShellApplication {
+          name = "louro-pi-filter";
+          runtimeInputs = filterInputs;
+          text = ''
+            exec node ${appSrc}/src/filter.ts "$@"
+          '';
+        };
         app = pkgs.runCommand "louro-pi-app" { } ''
           cp -r ${appSrc} $out
-          chmod u+w $out
+          chmod u+w $out $out/louro.toml
+          substituteInPlace $out/louro.toml --replace-fail @filter@ ${filter}/bin/louro-pi-filter
           ln -s ${nodeModules}/node_modules $out/node_modules
         '';
         npmScripts = [
@@ -64,11 +78,7 @@
           pkgs.stdenv.mkDerivation {
             name = "louro-pi-${script}";
             src = ./.;
-            nativeBuildInputs = [
-              nodejs
-              pkgs.gitleaks
-              pkgs.importNpmLock.linkNodeModulesHook
-            ];
+            nativeBuildInputs = filterInputs ++ [ pkgs.importNpmLock.linkNodeModulesHook ];
             npmDeps = nodeModules;
             buildPhase = "npm run ${script}";
             installPhase = "touch $out";
@@ -78,10 +88,7 @@
           entry = "${
             pkgs.writeShellApplication {
               name = "${script}-hook";
-              runtimeInputs = [
-                nodejs
-                pkgs.gitleaks
-              ];
+              runtimeInputs = filterInputs;
               text = "npm run ${script}";
             }
           }/bin/${script}-hook";
@@ -114,7 +121,20 @@
           '';
         };
 
-        checks = forEachScript npmCheck;
+        checks = forEachScript npmCheck // {
+          filter = pkgs.runCommand "louro-pi-filter-check" { } ''
+            filter() {
+              "$(grep -o '/nix/store/[^"]*/bin/louro-pi-filter' ${app}/louro.toml | head -n1)" ${filterArgs}
+            }
+            [ "$(echo 'mail a@b.com' | LOURO_ACCOUNT=luiz filter)" = 'mail a@b.com' ]
+            export LOURO_CHANNEL='#bots'
+            [ "$(echo 'mail a@b.com' | filter)" = 'mail [email]' ]
+            status=0
+            echo 'key AKIAZ7QW3RTY5UIO2PLK' | filter || status=$?
+            [ "$status" -eq 10 ]
+            touch $out
+          '';
+        };
 
         devShells.default = pkgs.mkShell {
           packages = runtimeInputs ++ [ pkgs.jq ] ++ gitHooks.enabledPackages;

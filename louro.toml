@@ -18,3 +18,8 @@ irc.whois = true
 irc.watch = true
 # For the operator; the louro-pi tool never lets the agent run quit.
 irc.quit = true
+
+[filter]
+# The build fills in the filter's path.
+# Accounts after the path may be sent personal details in DMs; secrets are blocked everywhere.
+outgoing = ["@filter@", "luiz"]
