@@ -48,8 +48,18 @@ function validIban(text: string): boolean {
 	return [...numeric].reduce((rest, digit) => (rest * 10 + Number(digit)) % 97, 0) === 1;
 }
 
+const NOT_A_PHONE = /^\d{4}-\d\d-\d\d|^\d{3}\.\d{3}\.\d{3}-\d{2}$|^\d{1,3}(?:\.\d{1,3}){3}$/;
+const hasPhoneFormatting = (text: string) =>
+	text.startsWith("+") || /\(\d{2,3}\)/.test(text) || /\d[\s.-]+\d+[\s.-]+\d/.test(text);
+
+function looksLikePhone(text: string): boolean {
+	const count = digitsOf(text).length;
+	return count >= 10 && count <= 13 && /\d{4}$/.test(text) && !NOT_A_PHONE.test(text) && hasPhoneFormatting(text);
+}
+
 type Rule = { label: string; pattern: RegExp; valid?: (match: string) => boolean };
 
+// Checksummed kinds run first, so an 11-digit CPF isn't taken for a phone number.
 const RULES: Rule[] = [
 	{
 		label: "card",
@@ -64,6 +74,13 @@ const RULES: Rule[] = [
 	{ label: "cpf", pattern: /(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)/g, valid: validCpf },
 	{ label: "ssn", pattern: /(?<!\d)(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}(?!\d)/g },
 	{ label: "iban", pattern: /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b/gi, valid: validIban },
+	{
+		label: "email",
+		// Skips IRC hostmasks (nick!~user@host), git remotes (git@host:repo) and image names (logo@2x.png).
+		pattern:
+			/(?<![!~A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?!(?:png|jpe?g|gif|svg|webp)\b)[A-Za-z]{2,}(?![\w-]|:\S)/g,
+	},
+	{ label: "phone", pattern: /(?<![\w+])\+?\(?\d[\d\s().-]{8,20}\d(?!\w)/g, valid: looksLikePhone },
 ];
 
 /** The text with personal details swapped for `[label]`, and the labels it swapped, in rule order. */
