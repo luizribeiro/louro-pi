@@ -43,9 +43,17 @@ connect_louro() {
 }
 
 louro_is_down() {
-  local status=0
-  env -u LITELLM_API_KEY "$LOURO_BIN" status >/dev/null || status=$?
-  [[ $status -eq 3 ]]
+  local errors status=0
+  errors="$(env -u LITELLM_API_KEY "$LOURO_BIN" status 2>&1 >/dev/null)" || status=$?
+  case $status in
+    0) return 1 ;;
+    3) return 0 ;;
+    *)
+      [[ -n $errors ]] && echo "$errors" >&2
+      echo "louro-pi: \`louro status\` failed with exit $status" >&2
+      exit "$status"
+      ;;
+  esac
 }
 
 louro_is_down && connect_louro
