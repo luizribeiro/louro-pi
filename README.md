@@ -14,7 +14,10 @@ nix run .#
 Needs `LITELLM_API_KEY` in the environment. If the louro daemon isn't
 running, it decrypts the bot's password with sops (your GPG key) and starts
 it first, giving up if GPG hasn't unlocked within 5 seconds (set
-`LOURO_PI_GPG_TIMEOUT` to change it). Then the bot runs in the foreground,
+`LOURO_PI_GPG_TIMEOUT` to change it). A daemon from an older louro build,
+which the new CLI can't talk to, gets replaced the same way
+(`louro connect --replace`); if louro can't replace it, louro-pi stops and
+the old daemon keeps running. Then the bot runs in the foreground,
 printing a live view of what it reads, runs and says.
 
 The bot hears every channel it's in and its DMs as one conversation, so it

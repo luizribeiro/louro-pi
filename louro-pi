@@ -36,26 +36,34 @@ connect_louro() {
   printf '%s' "$password" >"$fifo" &
   unset password
   local status=0
-  (cd "$run" && env -u LITELLM_API_KEY "$LOURO_BIN" connect --config "$src/louro.toml") || status=$?
+  (cd "$run" && env -u LITELLM_API_KEY "$LOURO_BIN" connect --config "$src/louro.toml" "$@") || status=$?
   kill $! 2>/dev/null || true
   rm -f "$fifo"
   return "$status"
 }
 
-louro_is_down() {
-  local errors status=0
-  errors="$(env -u LITELLM_API_KEY "$LOURO_BIN" status 2>&1 >/dev/null)" || status=$?
+louro_state() {
+  local output status=0
+  output="$(env -u LITELLM_API_KEY "$LOURO_BIN" status 2>&1)" || status=$?
   case $status in
-    0) return 1 ;;
-    3) return 0 ;;
+    0) echo running ;;
+    3) echo down ;;
     *)
-      [[ -n $errors ]] && echo "$errors" >&2
+      if [[ $status -eq 1 && $output == *'"code":'*'"version_mismatch"'* ]]; then
+        echo outdated
+        return
+      fi
+      [[ -n $output ]] && echo "$output" >&2
       echo "louro-pi: \`louro status\` failed with exit $status" >&2
-      exit "$status"
+      return "$status"
       ;;
   esac
 }
 
-louro_is_down && connect_louro
+state="$(louro_state)"
+case $state in
+  down) connect_louro ;;
+  outdated) connect_louro --replace ;;
+esac
 rm -rf "$run"
 exec node "$src/src/main.ts"
