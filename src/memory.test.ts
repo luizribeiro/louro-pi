@@ -4,18 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { createModels } from "@earendil-works/pi-ai";
-import {
-	type ConversationId,
-	createRegistry,
-	Harness,
-	LiveDoc,
-	type PromptInput,
-	type SubmissionId,
-	type TaskId,
-} from "@earendil-works/pi-durable";
-import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import type { Harness, PromptInput } from "@earendil-works/pi-durable";
 import { MAX_CALLS_PER_RUN, TOO_MANY_CALLS } from "./calls.ts";
+import { inNewRun, openHarness } from "./fixtures.ts";
 import {
 	editMemory,
 	MAX_MEMORY_CHARS,
@@ -100,23 +91,6 @@ test("shows the notes with their ids and dates, or that there are none", () => {
 	);
 	assert.equal(renderMemory([]), `${MEMORY_HEADER}\nYou have no notes yet.`);
 });
-
-async function openHarness(path: string) {
-	const storage = await openNodeSqliteStorage(path);
-	return Harness.open(storage, { models: createModels(), registry: createRegistry() }, BACKGROUND_CONTEXT);
-}
-
-let runs = 0;
-
-/** The tool's api inside a new run, committing to `harness` like pi-durable does. */
-function inNewRun(harness: Harness) {
-	const live = { run: { taskId: 30 as TaskId, inputs: [++runs as SubmissionId] } };
-	return {
-		conversationId: 1 as ConversationId,
-		snapshot: async (token: unknown) => (token === LiveDoc ? live : undefined),
-		commit: harness.commit.bind(harness),
-	} as unknown as Parameters<typeof memoryTool.execute>[1] & Parameters<typeof louroTool.execute>[1];
-}
 
 const render = (harness: Harness) =>
 	memorySection.render({ read: harness } as unknown as PromptInput, BACKGROUND_CONTEXT);

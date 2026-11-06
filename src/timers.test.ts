@@ -4,17 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { createModels } from "@earendil-works/pi-ai";
-import {
-	type ConversationId,
-	createRegistry,
-	Harness,
-	LiveDoc,
-	type PromptInput,
-	type SubmissionId,
-	type TaskId,
-} from "@earendil-works/pi-durable";
-import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import type { Harness, PromptInput } from "@earendil-works/pi-durable";
+import { inNewRun, openHarness } from "./fixtures.ts";
 import {
 	advanceTimers,
 	dueTimers,
@@ -191,22 +182,6 @@ test("wakes the bot with a timer event whose request id names that firing", () =
 	});
 	assert.equal(JSON.parse(String(timerInput(STANDUP, NOW).content)).events[0].every, undefined);
 });
-
-async function openHarness(path: string) {
-	const storage = await openNodeSqliteStorage(path);
-	return Harness.open(storage, { models: createModels(), registry: createRegistry() }, BACKGROUND_CONTEXT);
-}
-
-let runs = 0;
-
-function inNewRun(harness: Harness) {
-	const live = { run: { taskId: 30 as TaskId, inputs: [++runs as SubmissionId] } };
-	return {
-		conversationId: 1 as ConversationId,
-		snapshot: async (token: unknown) => (token === LiveDoc ? live : undefined),
-		commit: harness.commit.bind(harness),
-	} as unknown as Parameters<typeof timerTool.execute>[1];
-}
 
 test("the tool keeps timers across restarts, and the prompt shows them", async () => {
 	const path = join(await mkdtemp(join(tmpdir(), "louro-pi-timers-")), "louro.sqlite");

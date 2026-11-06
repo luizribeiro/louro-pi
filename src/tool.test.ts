@@ -1,23 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { type ConversationId, LiveDoc, type SubmissionId, type TaskId } from "@earendil-works/pi-durable";
+import type { ConversationId } from "@earendil-works/pi-durable";
 import { CALLS_BEFORE_ENDING_RUN, MAX_CALLS_PER_RUN, TOO_MANY_CALLS } from "./calls.ts";
+import { inNewRun } from "./fixtures.ts";
 import { memorySection } from "./memory.ts";
 import { timersSection } from "./timers.ts";
 import { louroExtension, louroTool, ROOM_NOTE, WAIT_NOTE } from "./tool.ts";
 
 const SYSTEM = "You are louro, a bot on IRC.\n";
 const PRIMER = "louro connects you to IRC as a bot.\n\nRun `louro <command> --help` for a command's flags.\n";
-
-let runs = 0;
-
-/** The tool's api inside a new run of a conversation, as pi-durable's documents show it. */
-function inNewRun() {
-	const live = { run: { taskId: 30 as TaskId, inputs: [++runs as SubmissionId] } };
-	const snapshot = async (token: unknown) => (token === LiveDoc ? live : undefined);
-	return { conversationId: 1 as ConversationId, snapshot } as unknown as Parameters<typeof louroTool.execute>[1];
-}
 
 async function refusal(command: string, api: ReturnType<typeof inNewRun>) {
 	const result = await louroTool.execute({ command }, api, BACKGROUND_CONTEXT);
