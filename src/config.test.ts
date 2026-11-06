@@ -4,6 +4,7 @@ import { agentChange, CONTEXT_WINDOW, harnessSettings } from "./config.ts";
 import { memoryTool } from "./memory.ts";
 import { timerTool } from "./timers.ts";
 import { louroExtension, louroTool } from "./tool.ts";
+import { webTool } from "./webtool.ts";
 
 const extension = louroExtension("You are louro, a bot on IRC.", "louro connects you to IRC as a bot.");
 
@@ -12,7 +13,7 @@ test("the agent runs Qwen with only the louro extension and its tools", () => {
 		model: { provider: "litellm", modelId: "vllm/qwen3.8-27b" },
 		thinkingLevel: "medium",
 		extensions: [extension],
-		tools: [louroTool, memoryTool, timerTool],
+		tools: [louroTool, memoryTool, timerTool, webTool],
 	});
 });
 

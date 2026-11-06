@@ -17,11 +17,11 @@ async function refusal(command: string, api: ReturnType<typeof inNewRun>) {
 	return JSON.stringify(result.output);
 }
 
-test("the extension has the louro, memory and timer tools, an untagged prompt, then the memory and timers", async () => {
+test("the extension has the louro, memory, timer and web tools, an untagged prompt, then the memory and timers", async () => {
 	const extension = louroExtension(SYSTEM, PRIMER);
 	assert.deepEqual(
 		extension.tools?.map((tool) => tool.name),
-		["louro", "memory", "timer"],
+		["louro", "memory", "timer", "web"],
 	);
 	const [prompt, memory, timers, ...rest] = extension.sections ?? [];
 	assert.equal(rest.length, 0);
