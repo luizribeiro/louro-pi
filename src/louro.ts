@@ -3,10 +3,11 @@ import type { ExecError } from "./command.ts";
 
 const LOURO_BIN = process.env.LOURO_BIN ?? "louro";
 
-/** louro never needs the model's key, and a louro bug could leak what it is given. */
+const BOT_KEYS = ["LITELLM_API_KEY", "KAGI_API_KEY"];
+
+/** louro never needs the bot's API keys, and a louro bug could leak what it is given. */
 export function louroEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-	const { LITELLM_API_KEY: _, ...rest } = env;
-	return rest;
+	return Object.fromEntries(Object.entries(env).filter(([name]) => !BOT_KEYS.includes(name)));
 }
 
 export type LouroResult = { error: ExecError | null; stdout: string; stderr: string };

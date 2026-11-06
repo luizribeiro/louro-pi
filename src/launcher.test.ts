@@ -36,9 +36,12 @@ async function launch({ statusCode, statusStdout = "", statusStderr = UNREACHABL
 	await writeScript(
 		join(bin, "louro"),
 		`case "$1" in
-  status) cat "${stdoutFile}"; cat "${stderrFile}" >&2; exit ${statusCode} ;;
+  status)
+    [ -n "$LITELLM_API_KEY$KAGI_API_KEY" ] && echo "status saw an API key" >> "${log}"
+    cat "${stdoutFile}"; cat "${stderrFile}" >&2; exit ${statusCode} ;;
   connect)
     case " $* " in *" --replace "*) mode=" --replace" ;; esac
+    [ -n "$LITELLM_API_KEY$KAGI_API_KEY" ] && echo "connect saw an API key" >> "${log}"
     echo "connect$mode $(cat password)" >> "${log}"
     exit ${connectCode} ;;
 esac`,
@@ -46,7 +49,13 @@ esac`,
 	await writeScript(join(bin, "sops"), "printf hunter2");
 	const run = spawnSync("bash", [LAUNCHER], {
 		encoding: "utf8",
-		env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, LOURO_PI_SRC: src, LITELLM_API_KEY: "k" },
+		env: {
+			...process.env,
+			PATH: `${bin}:${process.env.PATH}`,
+			LOURO_PI_SRC: src,
+			LITELLM_API_KEY: "k",
+			KAGI_API_KEY: "kagi",
+		},
 	});
 	const steps = await readFile(log, "utf8").catch(() => "");
 	await rm(dir, { recursive: true, force: true });

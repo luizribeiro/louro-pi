@@ -11,6 +11,11 @@ fi
 LOURO_BIN="$(command -v "${LOURO_BIN:-louro}")"
 export LOURO_BIN
 
+# louro and its filter never need the bot's API keys, and a bug there could leak what they're given.
+run_louro() {
+  env -u LITELLM_API_KEY -u KAGI_API_KEY "$LOURO_BIN" "$@"
+}
+
 run="$(mktemp -d)"
 trap 'rm -rf "$run"' EXIT
 trap 'exit 130' INT
@@ -36,7 +41,7 @@ connect_louro() {
   printf '%s' "$password" >"$fifo" &
   unset password
   local status=0
-  (cd "$run" && env -u LITELLM_API_KEY "$LOURO_BIN" connect --config "$src/louro.toml" "$@") || status=$?
+  (cd "$run" && run_louro connect --config "$src/louro.toml" "$@") || status=$?
   kill $! 2>/dev/null || true
   rm -f "$fifo"
   return "$status"
@@ -44,7 +49,7 @@ connect_louro() {
 
 louro_state() {
   local output status=0
-  output="$(env -u LITELLM_API_KEY "$LOURO_BIN" status 2>&1)" || status=$?
+  output="$(run_louro status 2>&1)" || status=$?
   case $status in
     0) echo running ;;
     3) echo down ;;
