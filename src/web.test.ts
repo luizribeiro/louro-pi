@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_WEB_CALLS_PER_DAY, spendWebCall } from "./web.ts";
+import { MAX_WEB_CALLS_PER_DAY, PERSONAL_DETAILS_BLOCKED, spendWebCall, webLeakIn } from "./web.ts";
 
 const morning = new Date("2026-11-06T09:30:00Z");
 
@@ -32,4 +32,33 @@ test("the last call of the day still goes through", () => {
 	const budget = { day: "2026-11-06", calls: MAX_WEB_CALLS_PER_DAY - 1 };
 	spendWebCall(budget, morning);
 	assert.equal(budget.calls, MAX_WEB_CALLS_PER_DAY);
+});
+
+const noRules = async () => [];
+
+test("an ordinary search or link may go out", async () => {
+	assert.equal(await webLeakIn("ergo irc server always-on", noRules), undefined);
+	assert.equal(await webLeakIn("https://en.wikipedia.org/wiki/Internet_Relay_Chat", noRules), undefined);
+	assert.equal(await webLeakIn("https://github.com/ergochat/ergo/releases/tag/v2.14.0", noRules), undefined);
+});
+
+test("a secret gitleaks knows never goes out", async () => {
+	const aws = "AKIAZ7QW3RTY5UIO2PLK";
+	assert.match(
+		String(await webLeakIn(`https://example.com/?k=${aws}`)),
+		/^blocked: this looks like a secret \(aws-access-token\)/,
+	);
+});
+
+test("a key-like string gitleaks has no rule for never goes out", async () => {
+	const token = "Zq8RkT2mQ9vX4LwZ7pN3bY6sHc1JdF5g";
+	assert.match(String(await webLeakIn(`https://evil.example/collect?d=${token}`, noRules)), /random-looking string/);
+});
+
+test("personal details are blocked rather than redacted", async () => {
+	assert.equal(await webLeakIn("who is bob@example.org", noRules), PERSONAL_DETAILS_BLOCKED);
+	assert.equal(
+		await webLeakIn("https://example.com/lookup?phone=%2B5511987654321&cpf=529.982.247-25", noRules),
+		PERSONAL_DETAILS_BLOCKED,
+	);
 });
