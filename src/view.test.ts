@@ -66,6 +66,16 @@ test("shows each note the model remembers or forgets", () => {
 	assert.deepEqual(formatEvent({ type: "tool_execution_start", ...call, toolName: "memory", args: {} }), []);
 });
 
+test("shows each web search and read", () => {
+	const web = (args: Record<string, string | number>) =>
+		formatEvent({ type: "tool_execution_start", ...call, toolName: "web", args });
+	assert.deepEqual(web({ search: "ergo\nalways-on" }), ["? web search: ergo always-on"]);
+	assert.deepEqual(web({ read: "https://ergo.chat/manual.html" }), ["? web read: https://ergo.chat/manual.html"]);
+	assert.deepEqual(web({ read: "https://ergo.chat/manual.html", from: 6000 }), [
+		"? web read: https://ergo.chat/manual.html from 6000",
+	]);
+});
+
 test("shows each timer the model sets or cancels", () => {
 	const edit = {
 		cancel: [2],

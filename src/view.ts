@@ -52,7 +52,13 @@ function whenOf({ in: after, at, every }: Args): string {
 
 const louroLines = ({ command }: Args) => [`$ ${oneLine(String(command))}`];
 
+function webLines({ search, read, from }: Args): string[] {
+	if (search !== undefined) return [oneLine(`? web search: ${String(search)}`)];
+	return [oneLine(`? web read: ${String(read)}${from ? ` from ${String(from)}` : ""}`)];
+}
+
 const TOOL_LINES: Record<string, (args: Args) => string[]> = {
+	web: webLines,
 	memory: ({ remember, forget }) => edits("memory", forget, remember, (text) => `: ${text}`),
 	timer: ({ set, cancel }) =>
 		edits("timer", cancel, set, (item) => {
