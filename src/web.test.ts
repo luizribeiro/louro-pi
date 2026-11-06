@@ -3,9 +3,12 @@ import { test } from "node:test";
 import {
 	MAX_QUERY_CHARS,
 	MAX_WEB_CALLS_PER_DAY,
+	PAGE_WINDOW_CHARS,
 	PERSONAL_DETAILS_BLOCKED,
 	percentDecoded,
+	renderPage,
 	spendWebCall,
+	UNTRUSTED,
 	type WebArgs,
 	webLeakIn,
 	webRequest,
@@ -139,4 +142,27 @@ test("a request that can't be done says why, without repeating what was asked", 
 			JSON.stringify(args),
 		);
 	}
+});
+
+test("a page comes a window at a time, saying where the next starts", () => {
+	const page = `# IRC\n\n${"chat ".repeat(3000)}`;
+	const url = "https://en.wikipedia.org/wiki/IRC";
+	const window = (from: number) => JSON.parse(renderPage(url, page, from));
+	const first = window(0);
+	assert.equal(first.notice, UNTRUSTED);
+	assert.deepEqual([first.url, first.from, first.total, first.next], [url, 0, page.length, PAGE_WINDOW_CHARS]);
+	assert.equal(first.text, page.slice(0, PAGE_WINDOW_CHARS));
+	const middle = window(PAGE_WINDOW_CHARS);
+	assert.deepEqual(
+		[middle.next, middle.text],
+		[2 * PAGE_WINDOW_CHARS, page.slice(PAGE_WINDOW_CHARS, 2 * PAGE_WINDOW_CHARS)],
+	);
+	const last = window(2 * PAGE_WINDOW_CHARS);
+	assert.deepEqual([last.next, last.text], [undefined, page.slice(2 * PAGE_WINDOW_CHARS)]);
+	assert.deepEqual([window(page.length + 10).text, window(page.length + 10).next], ["", undefined]);
+});
+
+test("a page that ends exactly at a window's edge has no next", () => {
+	const page = "x".repeat(PAGE_WINDOW_CHARS);
+	assert.equal(JSON.parse(renderPage("https://ergo.chat/", page, 0)).next, undefined);
 });
