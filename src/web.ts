@@ -1,6 +1,7 @@
 import { defineDoc } from "@earendil-works/pi-durable";
 import { screen } from "./filter.ts";
 import { gitleaksRules } from "./gitleaks.ts";
+import { normalLink } from "./links.ts";
 
 // Kagi bills each call; 100 a day stays around a dollar.
 export const MAX_WEB_CALLS_PER_DAY = 100;
@@ -56,4 +57,27 @@ export async function webLeakIn(text: string, rules = gitleaksRules): Promise<st
 	const verdict = screen(readings, await rules(readings), false);
 	if ("block" in verdict) return verdict.block;
 	return verdict.note === undefined ? undefined : PERSONAL_DETAILS_BLOCKED;
+}
+
+export const MAX_QUERY_CHARS = 400;
+
+export type WebArgs = { search?: string | undefined; read?: string | undefined; from?: number | undefined };
+/** `outbound` is what leaves for Kagi: the query, or the link. */
+export type WebRequest = { kind: "search"; outbound: string } | { kind: "read"; outbound: string; from: number };
+
+/** The one thing a call asks for, or throws why it can't be done. */
+export function webRequest({ search, read, from }: WebArgs): WebRequest {
+	if ((search === undefined) === (read === undefined)) throw new Error("give either `search` or `read`, not both");
+	if (search !== undefined) {
+		if (from !== undefined) throw new Error("`from` goes with `read`");
+		const query = search.trim();
+		if (query === "") throw new Error("the search is empty");
+		if (query.length > MAX_QUERY_CHARS) throw new Error(`a search may be at most ${MAX_QUERY_CHARS} characters`);
+		return { kind: "search", outbound: query };
+	}
+	if (from !== undefined && !(Number.isInteger(from) && from >= 0))
+		throw new Error("`from` is a whole number, 0 or more");
+	const link = normalLink(String(read).trim());
+	if (link === undefined) throw new Error("`read` takes a whole https:// link, without a user or password");
+	return { kind: "read", outbound: link, from: from ?? 0 };
 }

@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_WEB_CALLS_PER_DAY, PERSONAL_DETAILS_BLOCKED, percentDecoded, spendWebCall, webLeakIn } from "./web.ts";
+import {
+	MAX_QUERY_CHARS,
+	MAX_WEB_CALLS_PER_DAY,
+	PERSONAL_DETAILS_BLOCKED,
+	percentDecoded,
+	spendWebCall,
+	type WebArgs,
+	webLeakIn,
+	webRequest,
+} from "./web.ts";
 
 const morning = new Date("2026-11-06T09:30:00Z");
 
@@ -94,4 +103,40 @@ test("gitleaks sees the decoded text too", async () => {
 	};
 	await webLeakIn("https://x.example/?k=AKIA%5A7QW", rules);
 	assert.match(String(seen[0]), /AKIAZ7QW/);
+});
+
+test("a request is either a search or a read of an https link", () => {
+	assert.deepEqual(webRequest({ search: "  ergo always-on  " }), { kind: "search", outbound: "ergo always-on" });
+	assert.deepEqual(webRequest({ read: "https://Ergo.Chat/about#history" }), {
+		kind: "read",
+		outbound: "https://ergo.chat/about",
+		from: 0,
+	});
+	assert.deepEqual(webRequest({ read: "https://ergo.chat/", from: 6000 }), {
+		kind: "read",
+		outbound: "https://ergo.chat/",
+		from: 6000,
+	});
+});
+
+test("a request that can't be done says why, without repeating what was asked", () => {
+	const refusals: [WebArgs, RegExp][] = [
+		[{}, /either `search` or `read`/],
+		[{ search: "ergo", read: "https://ergo.chat/" }, /either `search` or `read`/],
+		[{ search: "   " }, /the search is empty/],
+		[{ search: "x".repeat(MAX_QUERY_CHARS + 1) }, /at most 400 characters/],
+		[{ search: "ergo", from: 10 }, /`from` goes with `read`/],
+		[{ read: "https://ergo.chat/", from: -5 }, /whole number, 0 or more/],
+		[{ read: "https://ergo.chat/", from: 1.5 }, /whole number, 0 or more/],
+		[{ read: "ergo.chat/secret-path" }, /whole https:\/\/ link/],
+		[{ read: "http://localhost:8080/admin" }, /whole https:\/\/ link/],
+		[{ read: "https://luiz:hunter2@ergo.chat/" }, /without a user or password/],
+	];
+	for (const [args, why] of refusals) {
+		assert.throws(
+			() => webRequest(args),
+			(error: Error) => why.test(error.message) && !/secret-path|hunter2|localhost/.test(error.message),
+			JSON.stringify(args),
+		);
+	}
 });
