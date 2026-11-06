@@ -17,8 +17,8 @@ import { formatEvent } from "./view.ts";
 import { forwardEvents, WAIT_ARGS } from "./wait.ts";
 import { wakeForTimers } from "./wake.ts";
 
-// Margin over wait's own 60s timeout plus its settle time, so only a hung louro gets killed.
-const WAIT_TIMEOUT_MS = 90_000;
+// Wait's own 60s, plus the 2 minutes it keeps retrying through a daemon restart, plus margin: only a hung louro gets killed.
+const WAIT_TIMEOUT_MS = 210_000;
 const SYSTEM_PATH = process.env.LOURO_PI_SYSTEM ?? new URL("../SYSTEM.md", import.meta.url);
 
 async function primer(): Promise<string> {
