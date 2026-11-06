@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extract, MAX_RESULTS, MAX_SNIPPET_CHARS, plainText, search } from "./kagi.ts";
+import {
+	extract,
+	MAX_REASON_CHARS,
+	MAX_RESULTS,
+	MAX_SNIPPET_CHARS,
+	MAX_TITLE_CHARS,
+	MAX_URL_CHARS,
+	plainText,
+	search,
+} from "./kagi.ts";
 
 const KEY = "kagi-7Qm2Xv9pL4sT8wRz";
 
@@ -120,4 +129,25 @@ test("the caller's abort cancels the call", async () => {
 	const pending = search("ergo", { key: KEY, fetch: send, signal: controller.signal });
 	controller.abort(new Error("run ended"));
 	await assert.rejects(pending, /run ended/);
+});
+
+test("search bounds titles and drops results whose links are too long to pass on", async () => {
+	const long = { url: `https://ergo.chat/${"a".repeat(MAX_URL_CHARS)}`, title: "too long a link" };
+	const wordy = { url: "https://ergo.chat/", title: "Ergo ".repeat(100) };
+	const results = await search("ergo", { key: KEY, fetch: fakeFetch(200, { data: { search: [long, wordy] } }).fetch });
+	assert.equal(results.length, 1);
+	assert.equal(results[0]?.title.length, MAX_TITLE_CHARS);
+});
+
+test("kagi's reasons are bounded, so a hostile error can't flood the model", async () => {
+	const { fetch } = fakeFetch(500, { errors: [{ code: "internal", message: "x".repeat(5000) }] });
+	await assert.rejects(search("ergo", { key: KEY, fetch }), (error: Error) => {
+		assert.ok(error.message.length < MAX_REASON_CHARS + 50);
+		return true;
+	});
+	const page = fakeFetch(200, { data: [{ url: "https://ergo.chat/", error: "y".repeat(5000) }] }).fetch;
+	await assert.rejects(extract("https://ergo.chat/", { key: KEY, fetch: page }), (error: Error) => {
+		assert.ok(error.message.length < MAX_REASON_CHARS + 50);
+		return true;
+	});
 });
