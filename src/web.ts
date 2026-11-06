@@ -89,8 +89,10 @@ export function webRequest({ search, read, from }: WebArgs): WebRequest {
 export const untrusted = (body: object) => JSON.stringify({ notice: UNTRUSTED, ...body });
 
 /** One window of a page's text, saying where the next one starts if there's more. */
+export const pageWindow = (markdown: string, from: number) => markdown.slice(from, from + PAGE_WINDOW_CHARS);
+
 export function renderPage(url: string, markdown: string, from: number): string {
-	const text = markdown.slice(from, from + PAGE_WINDOW_CHARS);
+	const text = pageWindow(markdown, from);
 	const next = from + PAGE_WINDOW_CHARS < markdown.length ? { next: from + PAGE_WINDOW_CHARS } : {};
 	return untrusted({ url, from, total: markdown.length, ...next, text });
 }

@@ -2,10 +2,13 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ToolExecutionResult } from "@earendil-works/pi-durable";
 import { capCalls, failure } from "./calls.ts";
 import { gitleaksRules } from "./gitleaks.ts";
-import { type KagiClient, search } from "./kagi.ts";
+import { extract, type KagiClient, search } from "./kagi.ts";
+import { linksIn, normalLink, rememberLinks, SeenLinks } from "./links.ts";
 import {
 	MAX_WEB_CALLS_PER_DAY,
 	PAGE_WINDOW_CHARS,
+	pageWindow,
+	renderPage,
 	spendWebCall,
 	untrusted,
 	WebBudget,
@@ -15,6 +18,10 @@ import {
 } from "./web.ts";
 
 export const NOT_SET_UP = "the web isn't set up: louro-pi has no KAGI_API_KEY";
+export const UNSEEN_LINK =
+	"you can read only a link you've seen in chat, in search results or on a page you read; search for it first";
+// Enough to page back and forth through a few pages without paying for them again.
+export const CACHED_PAGES = 8;
 
 export type WebDeps = {
 	key?: () => string | undefined;
@@ -23,11 +30,36 @@ export type WebDeps = {
 	now?: () => Date;
 };
 
-async function answer(request: WebRequest, client: KagiClient): Promise<string> {
+/** What to show the model, the links it may now read, and the page fetched, if any. */
+type Answer = { text: string; links: string[]; page?: string };
+
+/** Recently read pages by link, oldest first. */
+function pageCache() {
+	const pages = new Map<string, string>();
+	return {
+		get: (url: string) => pages.get(url),
+		set(url: string, markdown: string) {
+			pages.delete(url);
+			pages.set(url, markdown);
+			for (const oldest of pages.keys()) if (pages.size > CACHED_PAGES) pages.delete(oldest);
+		},
+	};
+}
+
+async function answer(request: WebRequest, client: KagiClient, cached: string | undefined): Promise<Answer> {
 	if (request.kind === "search") {
-		return untrusted({ query: request.outbound, results: await search(request.outbound, client) });
+		const results = await search(request.outbound, client);
+		return {
+			text: untrusted({ query: request.outbound, results }),
+			links: results.flatMap((result) => normalLink(result.url) ?? []),
+		};
 	}
-	throw new Error("reading pages isn't available yet");
+	const page = cached ?? (await extract(request.outbound, client));
+	return {
+		text: renderPage(request.outbound, page, request.from),
+		links: linksIn(pageWindow(page, request.from)),
+		page,
+	};
 }
 
 export function createWebTool({
@@ -36,6 +68,7 @@ export function createWebTool({
 	rules = gitleaksRules,
 	now = () => new Date(),
 }: WebDeps = {}) {
+	const pages = pageCache();
 	return defineTool({
 		name: "web",
 		description: `Search the web or read a page, through Kagi. \`search\` gives the top results with their links; \`read\` gives the text of a page whose link you've seen in chat, a search or another page, ${PAGE_WINDOW_CHARS} characters at a time, with \`next\` to pass as \`from\` for more. Each search or new page costs money, ${MAX_WEB_CALLS_PER_DAY} a day at most. Searches and links go to Kagi and the page's site, so secrets and personal details are refused.`,
@@ -55,8 +88,17 @@ export function createWebTool({
 				const request = webRequest(args);
 				const leak = await webLeakIn(request.outbound, rules);
 				if (leak) return failure(leak);
-				await api.commit(async (tx) => spendWebCall(await tx.doc(WebBudget), now()), context);
-				const text = await answer(request, { key: kagiKey, fetch: send, signal: context.abortSignal });
+				const cached = request.kind === "read" ? pages.get(request.outbound) : undefined;
+				await api.commit(async (tx) => {
+					if (request.kind === "read" && !(await tx.doc(SeenLinks)).links.includes(request.outbound)) {
+						throw new Error(UNSEEN_LINK);
+					}
+					if (cached === undefined) spendWebCall(await tx.doc(WebBudget), now());
+				}, context);
+				const client = { key: kagiKey, fetch: send, signal: context.abortSignal };
+				const { text, links, page } = await answer(request, client, cached);
+				if (page !== undefined) pages.set(request.outbound, page);
+				await api.commit(async (tx) => rememberLinks(await tx.doc(SeenLinks), links), context);
 				return { output: [{ type: "text", text }], isError: false };
 			} catch (error) {
 				return failure((error as Error).message.replaceAll(kagiKey, "[key]"));

