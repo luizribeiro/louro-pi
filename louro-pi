@@ -48,11 +48,8 @@ louro_state() {
   case $status in
     0) echo running ;;
     3) echo down ;;
+    11) echo outdated ;;
     *)
-      if [[ $status -eq 1 && $output == *'"code":'*'"version_mismatch"'* ]]; then
-        echo outdated
-        return
-      fi
       [[ -n $output ]] && echo "$output" >&2
       echo "louro-pi: \`louro status\` failed with exit $status" >&2
       return "$status"

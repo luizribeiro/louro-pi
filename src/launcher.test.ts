@@ -76,14 +76,14 @@ test("a broken louro status stops the launch with its exit code", async () => {
 });
 
 test("a louro from an older build gets replaced before the bot starts", async () => {
-	const run = await launch({ statusCode: 1, statusStdout: MISMATCH });
+	const run = await launch({ statusCode: 11, statusStdout: MISMATCH });
 	assert.equal(run.status, 0);
 	assert.deepEqual(run.steps, ["connect --replace hunter2", "main"]);
 	assert.doesNotMatch(run.stderr, /version_mismatch/);
 });
 
 test("a louro that can't be replaced stops the launch with connect's exit code", async () => {
-	const run = await launch({ statusCode: 1, statusStdout: MISMATCH, connectCode: 3 });
+	const run = await launch({ statusCode: 11, statusStdout: MISMATCH, connectCode: 3 });
 	assert.equal(run.status, 3);
 	assert.deepEqual(run.steps, ["connect --replace hunter2"]);
 });
@@ -99,10 +99,4 @@ test("a louro that fails to connect stops the launch with its exit code", async 
 	const run = await launch({ statusCode: 3, connectCode: 2 });
 	assert.equal(run.status, 2);
 	assert.deepEqual(run.steps, ["connect hunter2"]);
-});
-
-test("a version mismatch with an exit other than 1 isn't mistaken for an older build", async () => {
-	const run = await launch({ statusCode: 127, statusStdout: MISMATCH });
-	assert.equal(run.status, 127);
-	assert.deepEqual(run.steps, []);
 });
