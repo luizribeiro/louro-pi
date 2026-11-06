@@ -8,6 +8,7 @@ import { formatResult } from "./command.ts";
 import { agentChange, harnessSettings, litellmModels } from "./config.ts";
 import { botConversation } from "./conversations.ts";
 import { IDLE_INSTRUCTIONS, idleCompaction } from "./idle.ts";
+import { rememberLinks, SeenLinks } from "./links.ts";
 import { runLouro } from "./louro.ts";
 import { privateStatePath } from "./state.ts";
 import { advanceTimers, Timers } from "./timers.ts";
@@ -81,8 +82,11 @@ const forwarding = forwardEvents(
 		wait: (signal) => runLouro(WAIT_ARGS, WAIT_TIMEOUT_MS, signal),
 		newId: randomUUID,
 		// Admission is owed once louro handed the batch over, so shutdown must not abort it.
-		submit: async ({ input, replyTargets }) => {
+		submit: async ({ input, replyTargets, links }) => {
 			idle.touch();
+			if (links.length > 0) {
+				await harness.commit(async (tx) => rememberLinks(await tx.doc(SeenLinks), links), BACKGROUND_CONTEXT);
+			}
 			const submission = await conversation.submit(input, BACKGROUND_CONTEXT);
 			if (replyTargets.length > 0) typing.expect(submission.id, replyTargets);
 		},

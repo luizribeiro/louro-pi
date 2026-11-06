@@ -1,5 +1,6 @@
 import type { InputSubmissionDraft } from "@earendil-works/pi-durable";
 import { formatResult } from "./command.ts";
+import { linksIn } from "./links.ts";
 import type { LouroResult } from "./louro.ts";
 import { formatBatch, formatReport } from "./view.ts";
 
@@ -59,8 +60,17 @@ const isReport = (event: Event) => event.type === "connection";
 
 const uniqueTargets = (events: Event[]) => [...new Set(events.flatMap((event) => replyTargetOf(event) ?? []))];
 
-/** `replyTargets` are where louro says an event names the bot or is a DM, so a reply is likely there. */
-export type Delivery = { input: InputSubmissionDraft; count: number; from: string[]; replyTargets: string[] };
+/**
+ * `replyTargets` are where louro says an event names the bot or is a DM, so a reply is likely there; `links` are the
+ * https links people wrote, which the bot may then read.
+ */
+export type Delivery = {
+	input: InputSubmissionDraft;
+	count: number;
+	from: string[];
+	replyTargets: string[];
+	links: string[];
+};
 
 export type WaitStep =
 	| { kind: "submit"; delivery: Delivery | undefined; reports: Event[] }
@@ -86,6 +96,7 @@ export function nextStep({ error, stdout, stderr }: LouroResult, newId: () => st
 					count: events.length,
 					from: uniqueTargets(events),
 					replyTargets: uniqueTargets(events.filter((event) => event.mentions_me === true)),
+					links: events.flatMap((event) => (typeof event.text === "string" ? linksIn(event.text) : [])),
 					input: {
 						type: "input",
 						content: renderBatch({ notice: batch.notice, events }),

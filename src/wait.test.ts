@@ -64,6 +64,7 @@ test("submits a batch as one follow-up input with a fresh request id", () => {
 			count: 1,
 			from: ["#bots"],
 			replyTargets: ["#bots"],
+			links: [],
 			input: followUp([MESSAGE], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90"),
 		},
 		reports: [],
@@ -103,10 +104,28 @@ test("submits every channel's chat and DM in one input, keeping louro's connecti
 			count: 3,
 			from: ["#bots", "luiz", "#lounge"],
 			replyTargets: ["#bots", "luiz"],
+			links: [],
 			input: followUp([MESSAGE, DM, lounge], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90"),
 		},
 		reports: [connection],
 	});
+});
+
+test("collects the https links people wrote, for the bot to read later", () => {
+	const link = {
+		...MESSAGE,
+		id: 48,
+		text: "louro: what's https://ergo.chat/about#history about? and https://ergo.chat/faq.",
+	};
+	const plain = { ...DM, id: 49, text: "no link here, just http://old.example/" };
+	const step = nextStep(
+		waited({ cursor: 49, timed_out: false, more: false, notice: NOTICE, events: [link, plain] }),
+		newId,
+	);
+	assert.deepEqual(step.kind === "submit" && step.delivery?.links, [
+		"https://ergo.chat/about",
+		"https://ergo.chat/faq",
+	]);
 });
 
 test("a batch of only connection reports submits nothing", () => {
@@ -135,6 +154,7 @@ test("submits a watched nick's presence change without expecting a reply anywher
 			count: 1,
 			from: [],
 			replyTargets: [],
+			links: [],
 			input: followUp([online], "0b6f2c1e-8a4d-4f7e-9c3b-5d2a1e6f7a90"),
 		},
 		reports: [],
