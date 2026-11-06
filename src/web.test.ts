@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_WEB_CALLS_PER_DAY, PERSONAL_DETAILS_BLOCKED, spendWebCall, webLeakIn } from "./web.ts";
+import { MAX_WEB_CALLS_PER_DAY, PERSONAL_DETAILS_BLOCKED, percentDecoded, spendWebCall, webLeakIn } from "./web.ts";
 
 const morning = new Date("2026-11-06T09:30:00Z");
 
@@ -61,4 +61,37 @@ test("personal details are blocked rather than redacted", async () => {
 		await webLeakIn("https://example.com/lookup?phone=%2B5511987654321&cpf=529.982.247-25", noRules),
 		PERSONAL_DETAILS_BLOCKED,
 	);
+});
+
+test("percent-decoding undoes escapes however deep, and leaves broken ones be", () => {
+	assert.equal(percentDecoded("bob%40example.org"), "bob@example.org");
+	assert.equal(percentDecoded("bob%2540example.org"), "bob@example.org");
+	assert.equal(percentDecoded("100%25 sure%"), "100% sure%");
+	assert.equal(percentDecoded("bob%40example.org%"), "bob@example.org%");
+	assert.equal(percentDecoded("caf%C3%A9 %C3"), "café %C3");
+	assert.equal(percentDecoded("plain"), "plain");
+});
+
+test("escaping personal details or keys doesn't get them past the check", async () => {
+	const escaped = [
+		"https://x.example/?e=bob%40example.org",
+		"https://x.example/?e=bob%2540example.org",
+		"https://x.example/?e=bob%40example.org&junk=%",
+		"https://x.example/?p=%2B55+11+98765-4321",
+		"who is bob%40example.org",
+	];
+	for (const text of escaped) assert.equal(await webLeakIn(text, noRules), PERSONAL_DETAILS_BLOCKED, text);
+	const token = "Zq8RkT2mQ9vX4LwZ7pN3bY6sHc1JdF5g";
+	const hidden = [...token].map((char) => `%${char.charCodeAt(0).toString(16)}`).join("");
+	assert.match(String(await webLeakIn(`https://x.example/?k=${hidden}`, noRules)), /random-looking string/);
+});
+
+test("gitleaks sees the decoded text too", async () => {
+	const seen: string[] = [];
+	const rules = async (text: string) => {
+		seen.push(text);
+		return [];
+	};
+	await webLeakIn("https://x.example/?k=AKIA%5A7QW", rules);
+	assert.match(String(seen[0]), /AKIAZ7QW/);
 });
