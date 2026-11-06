@@ -46,6 +46,17 @@ while louro-pi was stopped fires once on the next start. The live view shows
 each timer it sets (`+ timer in 45m: …`) or cancels (`- timer #2`), and each
 one that fires (`< timer #2`).
 
+With `KAGI_API_KEY` in the environment, the bot's `web` tool searches the web
+and reads pages through [Kagi's API](https://kagi.com/api/docs). Kagi fetches
+the pages, never this machine, and they come back marked untrusted. The bot
+may read only links it has seen: posted in chat, in search results, or on a
+page it read. A link it writes itself could carry what it knows to someone's
+server. Searches and links with secrets or personal details are refused, %-escaped
+or not. Kagi bills each search and page, so there are at most 100 web calls
+a UTC day, kept across restarts. Going on through a page read lately is
+free. louro never gets the key. The live view shows each call
+(`? web search: …`, `? web read: …`).
+
 Long prompts make the bot slow to answer, so its chat is summarized well
 before the model's window fills: in the background from about 64k tokens, and
 before its next reply at 80k, keeping the last 8k or so word for word. After
